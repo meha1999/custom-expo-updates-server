@@ -1,4 +1,3 @@
-import accepts from 'accepts';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import mime from 'mime';
@@ -13,6 +12,27 @@ import {
   getMetadataAsync,
   getUpdateBundlePathsForRuntimeVersionAsync,
 } from '../../common/helpers';
+
+type AIMChoice = { token: string; q: number };
+
+function parseAIM(header: string | string[] | undefined): AIMChoice[] {
+  const raw = Array.isArray(header) ? header.join(',') : (header ?? '');
+  return (
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((item, idx) => {
+        const [tokenPart, ...params] = item.split(';').map((x) => x.trim());
+        const qParam = params.find((p) => p.toLowerCase().startsWith('q='));
+        const q = qParam ? Number(qParam.split('=')[1]) : 1;
+        return { token: tokenPart.toLowerCase(), q: Number.isFinite(q) ? q : 1, idx };
+      })
+      // sort by q desc, then by original order (RFC style)
+      .sort((a, b) => b.q - a.q || a.idx - b.idx)
+      .map(({ token, q }) => ({ token, q }))
+  );
+}
 
 export default async function assetsEndpoint(req: NextApiRequest, res: NextApiResponse) {
   const { asset: assetName, runtimeVersion, platform } = req.query;
@@ -35,10 +55,11 @@ export default async function assetsEndpoint(req: NextApiRequest, res: NextApiRe
     return;
   }
 
-  const accept = accepts(req);
-  const acceptsBsdiff = accept.type(['application/vnd.bsdiff']) === 'application/vnd.bsdiff';
-  const currentUpdateId = req.headers['expo-current-update-id'];
-  const requestedUpdateId = req.headers['expo-requested-update-id'];
+  const AIMHeader = req.headers['a-im'];
+  const types = parseAIM(AIMHeader).map(({ token }) => token);
+  const acceptsBsdiff = types.includes('bsdiff');
+  const currentUpdateId = req.headers['if-none-match'];
+  const requestedUpdateId = req.headers['if-match'];
   if (
     acceptsBsdiff &&
     typeof currentUpdateId === 'string' &&
@@ -50,9 +71,12 @@ export default async function assetsEndpoint(req: NextApiRequest, res: NextApiRe
       await fsPromises.access(patchPath, fs.constants.F_OK);
       const stat = await fsPromises.stat(patchPath);
       console.log('Serving patch:', patchPath, ' Size:', stat.size);
-      res.setHeader('Content-Type', 'application/vnd.bsdiff');
+      res.setHeader('Content-Type', 'application/javascript');
       res.setHeader('Content-Length', String(stat.size));
-      res.statusCode = 200;
+      res.setHeader('im', 'bsdiff');
+      res.setHeader('etag', requestedUpdateId);
+      res.setHeader('delta-base', currentUpdateId);
+      res.statusCode = 226; // 226 = IM Used
       res.end(await fsPromises.readFile(patchPath, null));
       return;
     } catch {
