@@ -58,8 +58,8 @@ export default async function assetsEndpoint(req: NextApiRequest, res: NextApiRe
   const AIMHeader = req.headers['a-im'];
   const types = parseAIM(AIMHeader).map(({ token }) => token);
   const acceptsBsdiff = types.includes('bsdiff');
-  const currentUpdateId = req.headers['if-none-match'];
-  const requestedUpdateId = req.headers['if-match'];
+  const currentUpdateId = req.headers['expo-current-update-id'];
+  const requestedUpdateId = req.headers['expo-requested-update-id'];
   if (
     acceptsBsdiff &&
     typeof currentUpdateId === 'string' &&
@@ -74,8 +74,8 @@ export default async function assetsEndpoint(req: NextApiRequest, res: NextApiRe
       res.setHeader('Content-Type', 'application/javascript');
       res.setHeader('Content-Length', String(stat.size));
       res.setHeader('im', 'bsdiff');
-      res.setHeader('etag', requestedUpdateId);
-      res.setHeader('delta-base', currentUpdateId);
+      res.setHeader('expo-base-update-id', currentUpdateId);
+      res.setHeader('cache-control', 'no-store');
       res.statusCode = 226; // 226 = IM Used
       res.end(await fsPromises.readFile(patchPath, null));
       return;
