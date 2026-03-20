@@ -18,16 +18,28 @@ export default function SettingsPage() {
       title={t(locale, 'settings.title')}
       subtitle={t(locale, 'settings.subtitle')}
     >
-      {({ userRole }) => <SettingsContent userRole={userRole} />}
+      {({ userRole, setApp, refreshApps }) => (
+        <SettingsContent userRole={userRole} setApp={setApp} refreshApps={refreshApps} />
+      )}
     </DashboardPage>
   );
 }
 
-function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
+function SettingsContent({
+  userRole,
+  setApp,
+  refreshApps,
+}: {
+  userRole: 'admin' | 'viewer';
+  setApp: (slug: string) => Promise<void>;
+  refreshApps: () => Promise<void>;
+}) {
   const { locale } = useLocale();
   const [apps, setApps] = useState<AppItem[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [createdApp, setCreatedApp] = useState<AppItem | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [appName, setAppName] = useState('');
   const [appSlug, setAppSlug] = useState('');
@@ -72,13 +84,17 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   async function handleCreateApp(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
-      await jsonFetch('/api/admin/apps', {
+      const created = await jsonFetch<AppItem>('/api/admin/apps', {
         method: 'POST',
         body: JSON.stringify({ name: appName, slug: appSlug || undefined }),
       });
+      setCreatedApp(created);
+      setCopied(false);
       setAppName('');
       setAppSlug('');
       await load();
+      await refreshApps();
+      await setApp(created.slug);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad'));
     }
@@ -96,6 +112,24 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
       await load();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad'));
+    }
+  }
+
+  const manifestUrl = createdApp
+    ? `${
+        typeof window === 'undefined' ? '' : window.location.origin
+      }/api/manifest?app=${encodeURIComponent(createdApp.slug)}&channel=production`
+    : null;
+
+  async function copyManifestUrl(): Promise<void> {
+    if (!manifestUrl || typeof navigator === 'undefined') {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(manifestUrl);
+      setCopied(true);
+    } catch {
+      setCopied(false);
     }
   }
 
@@ -121,6 +155,33 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
               </div>
               <Button type="submit" className="self-end">{t(locale, 'settings.apps.create')}</Button>
             </form>
+          ) : null}
+          {createdApp && manifestUrl ? (
+            <div className="space-y-2 rounded-md border border-success/30 bg-success/10 p-3">
+              <p className="text-sm font-medium text-success">
+                {locale === 'fa'
+                  ? `آدرس آپدیت برای اپ ${createdApp.name} آماده است`
+                  : `Update URL for ${createdApp.name} is ready`}
+              </p>
+              <p className="break-all rounded border border-border bg-white px-2 py-1 text-xs">
+                {manifestUrl}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => void copyManifestUrl()}>
+                  {locale === 'fa' ? 'کپی URL' : 'Copy URL'}
+                </Button>
+                {copied ? (
+                  <span className="text-xs text-success">
+                    {locale === 'fa' ? 'کپی شد' : 'Copied'}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {locale === 'fa'
+                  ? 'این مقدار را داخل app.json در مسیر updates.url قرار دهید.'
+                  : 'Paste this value into app.json as updates.url.'}
+              </p>
+            </div>
           ) : null}
           <div className="overflow-auto">
             <Table>

@@ -8,7 +8,12 @@ import { DashboardShell } from './dashboard-shell';
 interface DashboardPageProps {
   title: string;
   subtitle?: string;
-  children: (context: { appSlug: string; userRole: 'admin' | 'viewer' }) => ReactNode;
+  children: (context: {
+    appSlug: string;
+    userRole: 'admin' | 'viewer';
+    setApp: (slug: string) => Promise<void>;
+    refreshApps: () => Promise<void>;
+  }) => ReactNode;
 }
 
 export function DashboardPage({ title, subtitle, children }: DashboardPageProps) {
@@ -34,7 +39,12 @@ export function DashboardPage({ title, subtitle, children }: DashboardPageProps)
       onChangeApp={appScope.setApp}
       onLogout={auth.logout}
     >
-      {children({ appSlug: appScope.appSlug, userRole: auth.user.role })}
+      {children({
+        appSlug: appScope.appSlug,
+        userRole: auth.user.role,
+        setApp: appScope.setApp,
+        refreshApps: appScope.refreshApps,
+      })}
     </DashboardShell>
   );
 }
