@@ -7,6 +7,7 @@ import type { Locale } from '../../lib/i18n';
 import { AppItem, AuthUser } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
+import { FieldLabel } from '../ui/field-label';
 import { Select } from '../ui/select';
 
 interface DashboardShellProps {
@@ -49,6 +50,18 @@ export function DashboardShell({
   const router = useRouter();
   const { locale, isRtl, setLocale } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const hints =
+    locale === 'fa'
+      ? {
+          activeApp:
+            'با تغییر اپ فعال، همه آمار، لاگ‌ها و عملیات انتشار برای همان اپ نمایش داده می‌شود.',
+          language: 'زبان رابط کاربری داشبورد را تغییر می‌دهد.',
+        }
+      : {
+          activeApp:
+            'Changing active app switches all stats, logs, and release operations to that app scope.',
+          language: 'Changes the dashboard interface language.',
+        };
 
   const visibleNav = useMemo(
     () => navItems.filter((item) => !item.adminOnly || user.role === 'admin'),
@@ -137,8 +150,8 @@ export function DashboardShell({
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{t(locale, 'shell.activeApp')}</span>
                 <div className="min-w-[180px]">
+                  <FieldLabel label={t(locale, 'shell.activeApp')} hint={hints.activeApp} />
                   <Select value={appSlug} onChange={(event) => void onChangeApp(event.target.value)}>
                     {apps.map((app) => (
                       <option key={app.id} value={app.slug}>
@@ -150,6 +163,7 @@ export function DashboardShell({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="min-w-[130px]">
+                  <FieldLabel label={t(locale, 'shell.language')} hint={hints.language} />
                   <Select
                     value={locale}
                     onChange={(event) => setLocale(event.target.value as Locale)}

@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from 'react';
 import { DashboardPage } from '../../components/layout/dashboard-page';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
+import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
@@ -32,6 +34,22 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
+  const hints =
+    locale === 'fa'
+      ? {
+          appName: 'نام نمایشی اپ در پنل مدیریت.',
+          appSlug: 'شناسه یکتا برای اپ که در API و فیلترها استفاده می‌شود.',
+          username: 'نام کاربری حساب جدید برای ورود به داشبورد.',
+          password: 'رمز عبور اولیه کاربر جدید.',
+          role: 'سطح دسترسی کاربر. مدیر دسترسی کامل دارد، مشاهده‌گر فقط خواندن.',
+        }
+      : {
+          appName: 'Display name of the app in the management panel.',
+          appSlug: 'Unique app identifier used in API calls and filtering.',
+          username: 'Username for the new dashboard account.',
+          password: 'Initial password for the new user.',
+          role: 'Access level. Admin has full access, viewer is read-only.',
+        };
 
   useEffect(() => {
     void load();
@@ -93,8 +111,14 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
         <CardContent className="space-y-3">
           {userRole === 'admin' ? (
             <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void handleCreateApp(event)}>
-              <Input value={appName} onChange={(event) => setAppName(event.target.value)} placeholder={t(locale, 'settings.apps.appName')} required />
-              <Input value={appSlug} onChange={(event) => setAppSlug(event.target.value)} placeholder={t(locale, 'settings.apps.appSlug')} />
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'settings.apps.appName')} hint={hints.appName} />
+                <Input value={appName} onChange={(event) => setAppName(event.target.value)} placeholder={t(locale, 'settings.apps.appName')} required />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'settings.apps.appSlug')} hint={hints.appSlug} />
+                <Input value={appSlug} onChange={(event) => setAppSlug(event.target.value)} placeholder={t(locale, 'settings.apps.appSlug')} />
+              </div>
               <Button type="submit">{t(locale, 'settings.apps.create')}</Button>
             </form>
           ) : null}
@@ -129,16 +153,21 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
         <CardContent className="space-y-3">
           {userRole === 'admin' ? (
             <form className="grid gap-3 md:grid-cols-4" onSubmit={(event) => void handleCreateUser(event)}>
-              <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t(locale, 'settings.users.username')} required />
-              <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t(locale, 'settings.users.password')} required />
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value as 'admin' | 'viewer')}
-                className="h-10 rounded-md border border-border bg-white px-3 text-sm"
-              >
-                <option value="viewer">{t(locale, 'settings.users.roleViewer')}</option>
-                <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
-              </select>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'settings.users.username')} hint={hints.username} />
+                <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t(locale, 'settings.users.username')} required />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'settings.users.password')} hint={hints.password} />
+                <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t(locale, 'settings.users.password')} required />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'settings.users.role')} hint={hints.role} />
+                <Select value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'viewer')}>
+                  <option value="viewer">{t(locale, 'settings.users.roleViewer')}</option>
+                  <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
+                </Select>
+              </div>
               <Button type="submit">{t(locale, 'settings.users.create')}</Button>
             </form>
           ) : (

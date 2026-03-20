@@ -3,6 +3,7 @@ import { DashboardPage } from '../../components/layout/dashboard-page';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useLocale } from '../../hooks/use-locale';
@@ -31,6 +32,16 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   const [scopes, setScopes] = useState<string[]>(['telemetry:write']);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hints =
+    locale === 'fa'
+      ? {
+          keyName: 'نام قابل شناسایی برای این کلید تا بعدا راحت‌تر مدیریت شود.',
+          scopes: 'دامنه دسترسی کلید. فقط مجوزهای لازم را انتخاب کنید.',
+        }
+      : {
+          keyName: 'A recognizable name so this key is easier to manage later.',
+          scopes: 'Permission scope for this key. Select only what is required.',
+        };
 
   useEffect(() => {
     if (userRole !== 'admin') return;
@@ -106,8 +117,16 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void createKey(event)}>
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'apiKeys.create.keyName')} required />
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'apiKeys.create.keyName')} hint={hints.keyName} />
+              <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'apiKeys.create.keyName')} required />
+            </div>
             <div className="md:col-span-2 flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
+              <FieldLabel
+                label={locale === 'fa' ? 'دسترسی‌ها' : 'Scopes'}
+                hint={hints.scopes}
+                className="w-full"
+              />
               {AVAILABLE_SCOPES.map((scope) => (
                 <label key={scope} className="inline-flex items-center gap-1 text-xs">
                   <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />

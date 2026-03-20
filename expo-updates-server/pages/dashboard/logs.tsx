@@ -3,6 +3,7 @@ import { DashboardPage } from '../../components/layout/dashboard-page';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useLocale } from '../../hooks/use-locale';
@@ -30,6 +31,18 @@ function LogsContent({ appSlug }: { appSlug: string }) {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<LogResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hints =
+    locale === 'fa'
+      ? {
+          search: 'جستجو در مسیر درخواست، پیام و شناسه دستگاه برای پیدا کردن رویدادهای خاص.',
+          eventType: 'نمایش فقط یک نوع رویداد مثل manifest.request یا telemetry.ack.',
+          status: 'فقط لاگ‌هایی با کد وضعیت HTTP مشخص‌شده را نمایش می‌دهد.',
+        }
+      : {
+          search: 'Search request path, message, and device ID to find specific events.',
+          eventType: 'Show only one event type such as manifest.request or telemetry.ack.',
+          status: 'Filter logs by a specific HTTP status code.',
+        };
 
   useEffect(() => {
     void load();
@@ -74,9 +87,18 @@ function LogsContent({ appSlug }: { appSlug: string }) {
           <CardDescription>{t(locale, 'logs.filters.description')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-4">
-          <Input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder={t(locale, 'logs.filters.search')} />
-          <Input value={eventType} onChange={(event) => { setPage(1); setEventType(event.target.value); }} placeholder={t(locale, 'logs.filters.eventType')} />
-          <Input value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} placeholder={t(locale, 'logs.filters.statusCode')} />
+          <div className="space-y-1">
+            <FieldLabel label={t(locale, 'logs.filters.search')} hint={hints.search} />
+            <Input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder={t(locale, 'logs.filters.search')} />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label={t(locale, 'logs.filters.eventType')} hint={hints.eventType} />
+            <Input value={eventType} onChange={(event) => { setPage(1); setEventType(event.target.value); }} placeholder={t(locale, 'logs.filters.eventType')} />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel label={t(locale, 'logs.filters.statusCode')} hint={hints.status} />
+            <Input value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} placeholder={t(locale, 'logs.filters.statusCode')} />
+          </div>
           <div className="flex items-center gap-2">
             <a href={exportUrl} className="text-sm text-primary underline underline-offset-4">{t(locale, 'logs.filters.exportCsv')}</a>
             <Button variant="outline" onClick={() => void load()}>{t(locale, 'logs.filters.refresh')}</Button>

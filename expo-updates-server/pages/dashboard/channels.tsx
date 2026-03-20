@@ -3,7 +3,9 @@ import { DashboardPage } from '../../components/layout/dashboard-page';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
+import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
 import { useLocale } from '../../hooks/use-locale';
@@ -40,6 +42,28 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [policyAllowlist, setPolicyAllowlist] = useState('');
   const [policyBlocklist, setPolicyBlocklist] = useState('');
   const [policyRollback, setPolicyRollback] = useState(false);
+  const hints =
+    locale === 'fa'
+      ? {
+          createChannel: 'نام کانال جدید برای ساخت استریم انتشار مجزا.',
+          policyChannel: 'کانالی که سیاست ران‌تایم روی آن اعمال می‌شود.',
+          runtimeVersion: 'نسخه ران‌تایمی که سیاست برای آن تعریف می‌شود.',
+          activeReleaseId: 'شناسه نسخه فعال. خالی بماند یعنی نسخه فعال حذف شود.',
+          rollout: 'درصد دستگاه‌های واجد شرایط برای دریافت آپدیت این سیاست.',
+          allowlist: 'در صورت مقداردهی، فقط همین Device IDها اجازه دریافت دارند.',
+          blocklist: 'Device IDهای این لیست هرگز این آپدیت را دریافت نمی‌کنند.',
+          rollback: 'اگر فعال باشد دستگاه‌ها به نسخه embedded اپ برمی‌گردند.',
+        }
+      : {
+          createChannel: 'Name of a new channel to create a separate release stream.',
+          policyChannel: 'Channel where this runtime policy will be applied.',
+          runtimeVersion: 'Runtime version this policy is scoped to.',
+          activeReleaseId: 'Active release ID. Leave empty to clear current assignment.',
+          rollout: 'Percentage of eligible devices that can receive this policy update.',
+          allowlist: 'If set, only these device IDs can receive this update.',
+          blocklist: 'Device IDs in this list are always excluded from this update.',
+          rollback: 'When enabled, devices are instructed to roll back to embedded update.',
+        };
 
   useEffect(() => {
     void loadData();
@@ -99,6 +123,15 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
     }
   }
 
+  const channelOptions = Array.from(
+    new Set([
+      ...channels.map((channel) => channel.name),
+      'production',
+      'staging',
+      'beta',
+    ]),
+  );
+
   return (
     <div className="space-y-4">
       {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -111,8 +144,11 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
               <CardTitle>{t(locale, 'channels.create.title')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <form className="flex items-center gap-2" onSubmit={(event) => void handleCreateChannel(event)}>
-                <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder={t(locale, 'channels.create.placeholder')} required />
+              <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={(event) => void handleCreateChannel(event)}>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.create.placeholder')} hint={hints.createChannel} />
+                  <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder={t(locale, 'channels.create.placeholder')} required />
+                </div>
                 <Button type="submit">{t(locale, 'channels.create.button')}</Button>
               </form>
             </CardContent>
@@ -125,16 +161,43 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
             </CardHeader>
             <CardContent>
               <form className="grid gap-3" onSubmit={(event) => void handlePolicyUpdate(event)}>
-                <Input value={policyChannelName} onChange={(event) => setPolicyChannelName(event.target.value)} placeholder={t(locale, 'channels.policy.channelName')} required />
-                <Input value={policyRuntimeVersion} onChange={(event) => setPolicyRuntimeVersion(event.target.value)} placeholder={t(locale, 'channels.policy.runtimeVersion')} required />
-                <Input value={policyActiveReleaseId} onChange={(event) => setPolicyActiveReleaseId(event.target.value)} placeholder={t(locale, 'channels.policy.activeReleaseId')} />
-                <Input type="number" min={0} max={100} value={policyRollout} onChange={(event) => setPolicyRollout(Number(event.target.value))} placeholder={t(locale, 'channels.policy.rollout')} required />
-                <Textarea value={policyAllowlist} onChange={(event) => setPolicyAllowlist(event.target.value)} placeholder={t(locale, 'channels.policy.allowlist')} />
-                <Textarea value={policyBlocklist} onChange={(event) => setPolicyBlocklist(event.target.value)} placeholder={t(locale, 'channels.policy.blocklist')} />
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={policyRollback} onChange={(event) => setPolicyRollback(event.target.checked)} />
-                  {t(locale, 'channels.policy.rollback')}
-                </label>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.channelName')} hint={hints.policyChannel} />
+                  <Select value={policyChannelName} onChange={(event) => setPolicyChannelName(event.target.value)}>
+                    {channelOptions.map((channel) => (
+                      <option key={`policy-${channel}`} value={channel}>
+                        {channel}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.runtimeVersion')} hint={hints.runtimeVersion} />
+                  <Input value={policyRuntimeVersion} onChange={(event) => setPolicyRuntimeVersion(event.target.value)} placeholder={t(locale, 'channels.policy.runtimeVersion')} required />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.activeReleaseId')} hint={hints.activeReleaseId} />
+                  <Input value={policyActiveReleaseId} onChange={(event) => setPolicyActiveReleaseId(event.target.value)} placeholder={t(locale, 'channels.policy.activeReleaseId')} />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.rollout')} hint={hints.rollout} />
+                  <Input type="number" min={0} max={100} value={policyRollout} onChange={(event) => setPolicyRollout(Number(event.target.value))} placeholder={t(locale, 'channels.policy.rollout')} required />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.allowlist')} hint={hints.allowlist} />
+                  <Textarea value={policyAllowlist} onChange={(event) => setPolicyAllowlist(event.target.value)} placeholder={t(locale, 'channels.policy.allowlist')} />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.blocklist')} hint={hints.blocklist} />
+                  <Textarea value={policyBlocklist} onChange={(event) => setPolicyBlocklist(event.target.value)} placeholder={t(locale, 'channels.policy.blocklist')} />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel label={t(locale, 'channels.policy.rollback')} hint={hints.rollback} />
+                  <label className="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={policyRollback} onChange={(event) => setPolicyRollback(event.target.checked)} />
+                    {t(locale, 'channels.policy.rollback')}
+                  </label>
+                </div>
                 <Button type="submit">{t(locale, 'channels.policy.button')}</Button>
               </form>
             </CardContent>

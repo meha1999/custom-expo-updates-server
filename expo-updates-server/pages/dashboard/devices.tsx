@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DashboardPage } from '../../components/layout/dashboard-page';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useLocale } from '../../hooks/use-locale';
@@ -27,6 +28,10 @@ function DevicesContent({ appSlug }: { appSlug: string }) {
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const searchHint =
+    locale === 'fa'
+      ? 'دستگاه‌ها را با شناسه دستگاه، نسخه اپ، ران‌تایم یا کانال فیلتر می‌کند.'
+      : 'Filters devices by device ID, app version, runtime version, or channel.';
 
   useEffect(() => {
     let active = true;
@@ -76,6 +81,7 @@ function DevicesContent({ appSlug }: { appSlug: string }) {
         </CardHeader>
         <CardContent>
           <div className="mb-3 max-w-sm">
+            <FieldLabel label={t(locale, 'logs.filters.search')} hint={searchHint} />
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}

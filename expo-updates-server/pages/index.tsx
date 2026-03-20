@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useLocale } from '../hooks/use-locale';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { FieldLabel } from '../components/ui/field-label';
 import { Input } from '../components/ui/input';
 import { t } from '../lib/i18n';
 import type { Locale } from '../lib/i18n';
@@ -18,6 +19,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hints =
+    locale === 'fa'
+      ? {
+          language: 'زبان رابط کاربری داشبورد را تغییر می‌دهد.',
+          username: 'نام کاربری حسابی که دسترسی به داشبورد دارد.',
+          password: 'رمز عبور همان حساب کاربری برای ورود امن.',
+        }
+      : {
+          language: 'Changes the dashboard interface language.',
+          username: 'Username of the account that can access the dashboard.',
+          password: 'Password for that account used for secure sign in.',
+        };
 
   useEffect(() => {
     let active = true;
@@ -78,6 +91,11 @@ export default function LoginPage() {
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Expo</p>
               <div className="w-28">
+                <FieldLabel
+                  label={t(locale, 'shell.language')}
+                  hint={hints.language}
+                  className="justify-end"
+                />
                 <Select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
                   <option value="en">{t(locale, 'shell.english')}</option>
                   <option value="fa">{t(locale, 'shell.persian')}</option>
@@ -89,6 +107,7 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form className="space-y-3" onSubmit={handleSubmit}>
+              <FieldLabel label={t(locale, 'login.username')} hint={hints.username} />
               <Input
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -96,6 +115,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 required
               />
+              <FieldLabel label={t(locale, 'login.password')} hint={hints.password} />
               <Input
                 type="password"
                 value={password}
