@@ -1,0 +1,1 @@
+export { useLocale } from '../components/providers/locale-provider';

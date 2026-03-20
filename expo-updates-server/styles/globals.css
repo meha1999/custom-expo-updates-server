@@ -1,24 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --text-main: #1f2a37;
-  --bg-main: #f8fcff;
-}
-
-html,
-body {
-  padding: 0;
-  margin: 0;
-  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
-  color: var(--text-main);
-  background: var(--bg-main);
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
+  --background: 210 33% 99%;
+  --foreground: 222 30% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 30% 13%;
+  --border: 215 24% 90%;
+  --primary: 213 82% 48%;
+  --primary-foreground: 210 40% 99%;
+  --muted: 213 30% 96%;
+  --muted-foreground: 216 16% 46%;
+  --success: 150 67% 36%;
+  --danger: 354 70% 52%;
+  --warning: 32 95% 46%;
+  --radius: 14px;
 }
 
 * {
-  box-sizing: border-box;
+  @apply border-border;
+}
+
+html,
+body,
+#__next {
+  @apply h-full;
+}
+
+body {
+  @apply bg-background text-foreground;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  background-image:
+    radial-gradient(circle at 10% 15%, rgba(82, 204, 255, 0.08), transparent 30%),
+    radial-gradient(circle at 85% 10%, rgba(255, 190, 92, 0.1), transparent 35%);
+}
+
+html[dir='rtl'] body {
+  font-family: 'Vazirmatn', 'Segoe UI', sans-serif;
+  text-align: right;
+}
+
+html[dir='rtl'] input,
+html[dir='rtl'] textarea,
+html[dir='rtl'] select {
+  text-align: right;
+}
+
+a {
+  @apply text-inherit no-underline;
 }

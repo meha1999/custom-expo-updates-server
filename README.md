@@ -13,6 +13,49 @@ In some cases more control of how updates are sent to an app may be needed, and 
 
 ## Getting started
 
+### Step-by-step: start server, dashboard, and client
+
+1. Install dependencies for both projects:
+   - `cd expo-updates-server && yarn`
+   - `cd ../expo-updates-client && yarn`
+2. Configure server environment in `expo-updates-server/.env.local`:
+   - Set `HOSTNAME=http://localhost:3000`
+   - Optionally set:
+      cat > .env.local <<'EOF'
+   HOSTNAME=HOST_NAME:3000
+   DASHBOARD_ADMIN_USERNAME=admin
+   DASHBOARD_ADMIN_PASSWORD=change123456@Qaz
+   # PRIVATE_KEY_PATH=./code-signing-keys/private-key.pem
+   EOF
+3. Start the updates server + dashboard:
+   - `cd expo-updates-server`
+   - `yarn dev`
+4. Open dashboard and sign in:
+   - URL: `http://localhost:3000`
+   - Default login:
+     - Username: `admin`
+     - Password: `change-me-now`
+5. (Recommended) Create ingestion API keys in dashboard:
+   - Go to API Keys section
+   - Create `telemetry:write` key for `/api/telemetry/ack`
+   - Create `logs:write` key for `/api/telemetry/log` if needed
+6. Build and run release client:
+   - iOS: `cd ../expo-updates-client && yarn ios --configuration Release`
+   - Android: `cd ../expo-updates-client && yarn android --variant release`
+7. Publish an update bundle:
+   - `cd ../expo-updates-server`
+   - `yarn expo-publish`
+8. Test OTA flow:
+   - Force close and reopen the release app
+   - App requests `/api/manifest` and `/api/assets`
+   - Dashboard should show device activity, logs, releases, and policies
+9. Use control-plane operations from dashboard:
+   - Create apps/channels (`production`, `staging`, `beta`)
+   - Register/publish release
+   - Promote between channels
+   - Roll back to embedded
+   - Filter logs and export CSV
+
 ### Updates overview
 
 To understand this repo, it's important to understand some terminology around updates:
@@ -71,6 +114,18 @@ The code signing keys and certificates were generated using https://github.com/e
 ## Dashboard and telemetry
 
 The `expo-updates-server` app now includes a built-in dashboard at `/` and an API endpoint at `/api/dashboard`.
+
+- UI stack:
+  - Tailwind CSS for responsive layout
+  - shadcn-style component structure under `expo-updates-server/components/ui`
+- Dashboard pages:
+  - `/dashboard` (Overview)
+  - `/dashboard/releases`
+  - `/dashboard/channels`
+  - `/dashboard/devices`
+  - `/dashboard/logs`
+  - `/dashboard/api-keys`
+  - `/dashboard/settings`
 
 - The dashboard API aggregates:
   - request logs from `/api/manifest`, `/api/assets`, and telemetry endpoints
