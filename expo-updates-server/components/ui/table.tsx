@@ -2,7 +2,7 @@ import { HTMLAttributes } from 'react';
 import { cn } from '../../lib/utils';
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
-  return <table className={cn('w-full text-sm', className)} {...props} />;
+  return <table className={cn('w-full min-w-full table-auto text-sm', className)} {...props} />;
 }
 
 export function Th({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) {

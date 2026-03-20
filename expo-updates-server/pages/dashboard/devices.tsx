@@ -93,28 +93,59 @@ function DevicesContent({ appSlug }: { appSlug: string }) {
               <thead>
                 <tr>
                   <Th>{t(locale, 'devices.inventory.device')}</Th>
+                  <Th>{locale === 'fa' ? 'اپ' : 'App'}</Th>
                   <Th>{t(locale, 'devices.inventory.platform')}</Th>
                   <Th>{t(locale, 'devices.inventory.runtime')}</Th>
                   <Th>{t(locale, 'devices.inventory.appVersion')}</Th>
                   <Th>{t(locale, 'devices.inventory.channel')}</Th>
                   <Th>{t(locale, 'devices.inventory.requests')}</Th>
+                  <Th>{locale === 'fa' ? 'اولین مشاهده' : 'First Seen'}</Th>
                   <Th>{t(locale, 'devices.inventory.lastSeen')}</Th>
+                  <Th>{locale === 'fa' ? 'وضعیت فعالیت' : 'Activity'}</Th>
                 </tr>
               </thead>
               <tbody>
-                {filteredDevices.map((device) => (
-                  <tr key={device.id}>
-                    <Td>{device.deviceId}</Td>
-                    <Td>
-                      <Badge variant="muted">{device.platform ?? t(locale, 'devices.inventory.unknown')}</Badge>
-                    </Td>
-                    <Td>{device.runtimeVersion ?? '-'}</Td>
-                    <Td>{device.appVersion ?? '-'}</Td>
-                    <Td>{device.channelName ?? '-'}</Td>
-                    <Td>{device.totalRequests}</Td>
-                    <Td>{formatDate(device.lastSeen, locale)}</Td>
-                  </tr>
-                ))}
+                {filteredDevices.map((device) => {
+                  const lastSeenTime = new Date(device.lastSeen).getTime();
+                  const ageHours =
+                    Number.isNaN(lastSeenTime) ? Number.POSITIVE_INFINITY : (Date.now() - lastSeenTime) / 36e5;
+                  const activity =
+                    ageHours <= 24
+                      ? {
+                          label: locale === 'fa' ? 'فعال' : 'Active',
+                          variant: 'success' as const,
+                        }
+                      : ageHours <= 24 * 7
+                        ? {
+                            label: locale === 'fa' ? 'کم‌فعال' : 'Low',
+                            variant: 'warning' as const,
+                          }
+                        : {
+                            label: locale === 'fa' ? 'غیرفعال' : 'Inactive',
+                            variant: 'muted' as const,
+                          };
+
+                  return (
+                    <tr key={device.id}>
+                      <Td>
+                        <span className="font-mono text-xs">{device.deviceId}</span>
+                      </Td>
+                      <Td>{device.appSlug}</Td>
+                      <Td>
+                        <Badge variant="muted">{device.platform ?? t(locale, 'devices.inventory.unknown')}</Badge>
+                      </Td>
+                      <Td>{device.runtimeVersion ?? '-'}</Td>
+                      <Td>{device.appVersion ?? '-'}</Td>
+                      <Td>{device.channelName ?? '-'}</Td>
+                      <Td>{device.totalRequests}</Td>
+                      <Td>{formatDate(device.firstSeen, locale)}</Td>
+                      <Td>{formatDate(device.lastSeen, locale)}</Td>
+                      <Td>
+                        <Badge variant={activity.variant}>{activity.label}</Badge>
+                      </Td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </Table>
           </div>

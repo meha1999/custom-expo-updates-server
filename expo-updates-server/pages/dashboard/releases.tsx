@@ -671,7 +671,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
         </section>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-4">
         <Card>
           <CardHeader>
             <CardTitle>{t(locale, 'releases.recent.title')}</CardTitle>
@@ -683,6 +683,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                   <Th>{t(locale, 'releases.recent.id')}</Th>
                   <Th>{t(locale, 'releases.recent.runtime')}</Th>
                   <Th>{t(locale, 'releases.recent.bundle')}</Th>
+                  <Th>{locale === 'fa' ? 'مسیر فایل' : 'Update Path'}</Th>
                   <Th>{t(locale, 'releases.recent.type')}</Th>
                   <Th>{t(locale, 'releases.recent.created')}</Th>
                 </tr>
@@ -693,6 +694,11 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                     <Td>{release.id}</Td>
                     <Td>{release.runtimeVersion}</Td>
                     <Td>{release.bundleId}</Td>
+                    <Td>
+                      <span className="break-all text-xs text-muted-foreground">
+                        {release.updatePath ?? `${release.runtimeVersion}/${release.bundleId}`}
+                      </span>
+                    </Td>
                     <Td>
                       <Badge variant={release.isRollback ? 'warning' : 'default'}>
                         {release.isRollback
@@ -718,7 +724,9 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                 <tr>
                   <Th>{t(locale, 'releases.audit.time')}</Th>
                   <Th>{t(locale, 'releases.audit.actor')}</Th>
+                  <Th>{locale === 'fa' ? 'اپ' : 'App'}</Th>
                   <Th>{t(locale, 'releases.audit.action')}</Th>
+                  <Th>{locale === 'fa' ? 'جزئیات' : 'Details'}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -727,10 +735,13 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                     <Td>{formatDate(entry.timestamp, locale)}</Td>
                     <Td>{entry.actorUsername}</Td>
                     <Td>
-                      <div className="space-y-1">
-                        <Badge variant="muted">{entry.action}</Badge>
-                        <p className="text-xs text-muted-foreground">{entry.detailsJson}</p>
-                      </div>
+                      <Badge variant="muted">{entry.appSlug}</Badge>
+                    </Td>
+                    <Td>
+                      <Badge variant="default">{entry.action}</Badge>
+                    </Td>
+                    <Td>
+                      <p className="max-w-[560px] break-all text-xs text-muted-foreground">{entry.detailsJson}</p>
                     </Td>
                   </tr>
                 ))}

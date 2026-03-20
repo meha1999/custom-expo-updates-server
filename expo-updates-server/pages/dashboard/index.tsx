@@ -133,7 +133,7 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-4">
         <Card>
           <CardHeader>
             <CardTitle>{t(locale, 'overview.recentEvents.title')}</CardTitle>
@@ -143,7 +143,10 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
               <thead>
                 <tr>
                   <Th>{t(locale, 'overview.recentEvents.time')}</Th>
+                  <Th>{locale === 'fa' ? 'برنامه/کانال' : 'App/Channel'}</Th>
                   <Th>{t(locale, 'overview.recentEvents.event')}</Th>
+                  <Th>{locale === 'fa' ? 'Runtime/پلتفرم' : 'Runtime/Platform'}</Th>
+                  <Th>{locale === 'fa' ? 'دستگاه' : 'Device'}</Th>
                   <Th>{t(locale, 'overview.recentEvents.status')}</Th>
                 </tr>
               </thead>
@@ -152,10 +155,27 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
                   <tr key={item.id}>
                     <Td>{formatDate(item.timestamp, locale)}</Td>
                     <Td>
+                      <div className="space-y-1">
+                        <span className="font-medium">{item.appSlug}</span>
+                        <div>
+                          <Badge variant="muted">{item.channelName ?? '-'}</Badge>
+                        </div>
+                      </div>
+                    </Td>
+                    <Td>
                       <div className="flex flex-col gap-1">
                         <span>{item.eventType}</span>
                         <span className="text-xs text-muted-foreground">{item.requestPath}</span>
                       </div>
+                    </Td>
+                    <Td>
+                      <div className="space-y-1">
+                        <span>{item.runtimeVersion ?? '-'}</span>
+                        <span className="block text-xs text-muted-foreground">{item.platform ?? '-'}</span>
+                      </div>
+                    </Td>
+                    <Td>
+                      <span className="font-mono text-xs">{item.deviceId}</span>
                     </Td>
                     <Td>
                       <Badge variant={item.status >= 400 ? 'danger' : 'success'}>{item.status}</Badge>
@@ -177,7 +197,9 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
                 <tr>
                   <Th>{t(locale, 'overview.recentReleases.runtime')}</Th>
                   <Th>{t(locale, 'overview.recentReleases.bundle')}</Th>
+                  <Th>{locale === 'fa' ? 'Manifest ID' : 'Manifest ID'}</Th>
                   <Th>{t(locale, 'overview.recentReleases.type')}</Th>
+                  <Th>{locale === 'fa' ? 'ایجاد شده در' : 'Created At'}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -186,12 +208,16 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
                     <Td>{item.runtimeVersion}</Td>
                     <Td>{item.bundleId}</Td>
                     <Td>
+                      <span className="font-mono text-xs">{item.manifestId ?? '-'}</span>
+                    </Td>
+                    <Td>
                       <Badge variant={item.isRollback ? 'warning' : 'default'}>
                         {item.isRollback
                           ? t(locale, 'overview.recentReleases.rollback')
                           : t(locale, 'overview.recentReleases.update')}
                       </Badge>
                     </Td>
+                    <Td>{formatDate(item.createdAt, locale)}</Td>
                   </tr>
                 ))}
               </tbody>

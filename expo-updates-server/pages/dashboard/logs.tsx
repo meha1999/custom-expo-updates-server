@@ -133,7 +133,9 @@ function LogsContent({ appSlug }: { appSlug: string }) {
             <Table>
               <thead>
                 <tr>
+                  <Th>{locale === 'fa' ? 'شناسه' : 'ID'}</Th>
                   <Th>{t(locale, 'logs.table.time')}</Th>
+                  <Th>{locale === 'fa' ? 'اپ' : 'App'}</Th>
                   <Th>{t(locale, 'logs.table.event')}</Th>
                   <Th>{t(locale, 'logs.table.status')}</Th>
                   <Th>{t(locale, 'logs.table.channel')}</Th>
@@ -145,14 +147,27 @@ function LogsContent({ appSlug }: { appSlug: string }) {
               <tbody>
                 {(data?.items ?? []).map((row) => (
                   <tr key={row.id}>
+                    <Td>
+                      <span className="font-mono text-xs">{row.id}</span>
+                    </Td>
                     <Td>{formatDate(row.timestamp, locale)}</Td>
-                    <Td>{row.event_type}</Td>
+                    <Td>{row.app_slug}</Td>
+                    <Td>
+                      <div className="space-y-1">
+                        <span>{row.event_type}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {row.method} {row.request_path}
+                        </span>
+                      </div>
+                    </Td>
                     <Td>
                       <Badge variant={row.status >= 400 ? 'danger' : 'success'}>{row.status}</Badge>
                     </Td>
                     <Td>{row.channel_name ?? '-'}</Td>
                     <Td>{row.runtime_version ?? '-'}</Td>
-                    <Td>{row.device_id}</Td>
+                    <Td>
+                      <span className="font-mono text-xs">{row.device_id}</span>
+                    </Td>
                     <Td>
                       <span className="text-xs text-muted-foreground">{row.message ?? '-'}</span>
                     </Td>

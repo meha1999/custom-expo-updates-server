@@ -9,6 +9,7 @@ import { Modal } from '../../components/ui/modal';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
+import { formatDate } from '../../lib/format';
 import { jsonFetch } from '../../lib/http';
 import { t } from '../../lib/i18n';
 import { ApiKeyItem } from '../../lib/types';
@@ -215,6 +216,7 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
                 <Th>{t(locale, 'apiKeys.list.name')}</Th>
                 <Th>{t(locale, 'apiKeys.list.prefix')}</Th>
                 <Th>{t(locale, 'apiKeys.list.scopes')}</Th>
+                <Th>{locale === 'fa' ? 'ایجاد شده' : 'Created'}</Th>
                 <Th>{t(locale, 'apiKeys.list.status')}</Th>
                 <Th>{t(locale, 'apiKeys.list.action')}</Th>
               </tr>
@@ -222,12 +224,31 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id}>
-                  <Td>{item.name}</Td>
-                  <Td>{item.keyPrefix}</Td>
-                  <Td>{item.scopes.join(', ')}</Td>
+                  <Td>
+                    <div className="space-y-1">
+                      <p>{item.name}</p>
+                      <p className="text-xs text-muted-foreground">ID: {item.id}</p>
+                    </div>
+                  </Td>
+                  <Td>
+                    <span className="font-mono text-xs">{item.keyPrefix}</span>
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-1">
+                      {item.scopes.map((scope) => (
+                        <Badge key={`${item.id}-${scope}`} variant="muted">
+                          {scope}
+                        </Badge>
+                      ))}
+                    </div>
+                  </Td>
+                  <Td>{formatDate(item.createdAt, locale)}</Td>
                   <Td>
                     {item.revokedAt ? (
-                      <Badge variant="danger">{t(locale, 'apiKeys.list.revoked')}</Badge>
+                      <div className="space-y-1">
+                        <Badge variant="danger">{t(locale, 'apiKeys.list.revoked')}</Badge>
+                        <p className="text-xs text-muted-foreground">{formatDate(item.revokedAt, locale)}</p>
+                      </div>
                     ) : (
                       <Badge variant="success">{t(locale, 'apiKeys.list.active')}</Badge>
                     )}

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { DashboardPage } from '../../components/layout/dashboard-page';
+import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { FieldLabel } from '../../components/ui/field-label';
@@ -9,6 +10,7 @@ import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
+import { formatDate } from '../../lib/format';
 import { jsonFetch } from '../../lib/http';
 import { t } from '../../lib/i18n';
 import { AppItem, AuthUser, ChannelItem } from '../../lib/types';
@@ -278,16 +280,38 @@ function SettingsContent({
                   <Th>{t(locale, 'settings.apps.id')}</Th>
                   <Th>{t(locale, 'settings.apps.name')}</Th>
                   <Th>{t(locale, 'settings.apps.slug')}</Th>
+                  <Th>{locale === 'fa' ? 'وضعیت' : 'Status'}</Th>
+                  <Th>{locale === 'fa' ? 'ایجاد شده' : 'Created'}</Th>
+                  <Th>{locale === 'fa' ? 'URL تولید' : 'Production URL'}</Th>
                 </tr>
               </thead>
               <tbody>
-                {apps.map((app) => (
-                  <tr key={app.id}>
-                    <Td>{app.id}</Td>
-                    <Td>{app.name}</Td>
-                    <Td>{app.slug}</Td>
-                  </tr>
-                ))}
+                {apps.map((app) => {
+                  const productionUrl = buildManifestUrl(app.slug, 'production');
+                  const isActive = app.slug === activeAppSlug;
+                  return (
+                    <tr key={app.id}>
+                      <Td>{app.id}</Td>
+                      <Td>{app.name}</Td>
+                      <Td>{app.slug}</Td>
+                      <Td>
+                        <Badge variant={isActive ? 'success' : 'muted'}>
+                          {isActive
+                            ? locale === 'fa'
+                              ? 'فعال'
+                              : 'Active'
+                            : locale === 'fa'
+                              ? 'غیرفعال'
+                              : 'Inactive'}
+                        </Badge>
+                      </Td>
+                      <Td>{formatDate(app.createdAt, locale)}</Td>
+                      <Td>
+                        <span className="break-all text-xs text-muted-foreground">{productionUrl || '-'}</span>
+                      </Td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </Table>
           </div>
@@ -317,6 +341,7 @@ function SettingsContent({
                   <Th>{t(locale, 'settings.users.id')}</Th>
                   <Th>{t(locale, 'settings.users.username')}</Th>
                   <Th>{t(locale, 'settings.users.role')}</Th>
+                  <Th>{locale === 'fa' ? 'سطح دسترسی' : 'Permission Scope'}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -325,6 +350,15 @@ function SettingsContent({
                     <Td>{user.id}</Td>
                     <Td>{user.username}</Td>
                     <Td>{t(locale, `shell.role.${user.role}`)}</Td>
+                    <Td>
+                      {user.role === 'admin'
+                        ? locale === 'fa'
+                          ? 'دسترسی کامل به انتشار، تنظیمات و عملیات'
+                          : 'Full access to releases, settings, and operations'
+                        : locale === 'fa'
+                          ? 'فقط مشاهده داشبورد و گزارش‌ها'
+                          : 'Read-only access to dashboard and logs'}
+                    </Td>
                   </tr>
                 ))}
               </tbody>

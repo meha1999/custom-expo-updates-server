@@ -145,6 +145,23 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
     }
   }
 
+  function buildManifestUrl(channelName: string): string {
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    return `${origin}/api/manifest?app=${encodeURIComponent(appSlug)}&channel=${encodeURIComponent(channelName)}`;
+  }
+
+  function countPolicyEntries(value: string): number {
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed)) {
+        return 0;
+      }
+      return parsed.filter((item) => typeof item === 'string' && item.trim().length > 0).length;
+    } catch {
+      return 0;
+    }
+  }
+
   const channelOptions = Array.from(
     new Set([
       ...channels.map((channel) => channel.name),
@@ -152,6 +169,10 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       'development',
     ]),
   );
+  const policyCountByChannel = policies.reduce<Record<string, number>>((acc, policy) => {
+    acc[policy.channelName] = (acc[policy.channelName] ?? 0) + 1;
+    return acc;
+  }, {});
   const rollbackPolicies = policies.filter((policy) => policy.rollbackToEmbedded).length;
   const activePolicies = policies.length - rollbackPolicies;
 
@@ -293,7 +314,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
         </Modal>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-4">
         <Card>
           <CardHeader>
             <CardTitle>{t(locale, 'channels.list.channelsTitle')}</CardTitle>
@@ -304,6 +325,8 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                 <tr>
                   <Th>{t(locale, 'channels.list.id')}</Th>
                   <Th>{t(locale, 'channels.list.name')}</Th>
+                  <Th>{locale === 'fa' ? 'تعداد سیاست‌ها' : 'Policies'}</Th>
+                  <Th>{locale === 'fa' ? 'URL مانيفست' : 'Manifest URL'}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -311,6 +334,12 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                   <tr key={channel.id}>
                     <Td>{channel.id}</Td>
                     <Td>{channel.name}</Td>
+                    <Td>{policyCountByChannel[channel.name] ?? 0}</Td>
+                    <Td>
+                      <span className="break-all text-xs text-muted-foreground">
+                        {buildManifestUrl(channel.name)}
+                      </span>
+                    </Td>
                   </tr>
                 ))}
               </tbody>
@@ -330,6 +359,8 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                   <Th>{t(locale, 'channels.list.runtime')}</Th>
                   <Th>{t(locale, 'channels.list.release')}</Th>
                   <Th>{t(locale, 'channels.list.rollout')}</Th>
+                  <Th>{locale === 'fa' ? 'Allowlist' : 'Allowlist'}</Th>
+                  <Th>{locale === 'fa' ? 'Blocklist' : 'Blocklist'}</Th>
                   <Th>{t(locale, 'channels.list.state')}</Th>
                 </tr>
               </thead>
@@ -340,6 +371,8 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                     <Td>{policy.runtimeVersion}</Td>
                     <Td>{policy.activeReleaseId ?? '-'}</Td>
                     <Td>{policy.rolloutPercentage}%</Td>
+                    <Td>{countPolicyEntries(policy.allowlistJson)}</Td>
+                    <Td>{countPolicyEntries(policy.blocklistJson)}</Td>
                     <Td>
                       {policy.rollbackToEmbedded ? (
                         <Badge variant="warning">{t(locale, 'channels.list.rollback')}</Badge>
