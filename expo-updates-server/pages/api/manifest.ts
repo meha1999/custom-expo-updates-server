@@ -1,8 +1,12 @@
 import FormData from 'form-data';
-import fs from 'fs/promises';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { serializeDictionary } from 'structured-headers';
 
+import {
+  insertRequestLog,
+  resolveReleaseForRequest,
+} from '../../common/controlPlaneDb';
+import { getRequestContext, getSingleValue } from '../../common/requestContext';
 import {
   getAssetMetadataAsync,
   getMetadataAsync,
@@ -11,96 +15,167 @@ import {
   signRSASHA256,
   getPrivateKeyAsync,
   getExpoConfigAsync,
-  getLatestUpdateBundlePathForRuntimeVersionAsync,
   createRollBackDirectiveAsync,
   NoUpdateAvailableError,
   createNoUpdateAvailableDirectiveAsync,
 } from '../../common/helpers';
 
 export default async function manifestEndpoint(req: NextApiRequest, res: NextApiResponse) {
+  const context = getRequestContext(req);
+  const runtimeVersion = context.runtimeVersion;
+  const platform = context.platform;
+  const protocolHeader = req.headers['expo-protocol-version'];
+
+  const logEvent = async (
+    eventType:
+      | 'manifest_update'
+      | 'manifest_rollback'
+      | 'manifest_no_update'
+      | 'manifest_error',
+    status: number,
+    extras?: {
+      updateId?: string;
+      bundlePath?: string;
+      message?: string;
+    },
+  ): Promise<void> => {
+    insertRequestLog({
+      timestamp: new Date().toISOString(),
+      eventType,
+      requestPath: '/api/manifest',
+      method: req.method ?? 'GET',
+      status,
+      appSlug: context.appSlug,
+      channelName: context.channelName,
+      platform,
+      runtimeVersion,
+      updateId: extras?.updateId,
+      bundlePath: extras?.bundlePath,
+      message: extras?.message,
+      ip: context.ip,
+      userAgent: context.userAgent,
+      deviceId: context.deviceId,
+      appVersion: context.appVersion,
+    });
+  };
+
   if (req.method !== 'GET') {
-    res.statusCode = 405;
-    res.json({ error: 'Expected GET.' });
+    res.status(405).json({ error: 'Expected GET.' });
+    await logEvent('manifest_error', 405, { message: 'Expected GET.' });
     return;
   }
 
-  const protocolVersionMaybeArray = req.headers['expo-protocol-version'];
-  if (protocolVersionMaybeArray && Array.isArray(protocolVersionMaybeArray)) {
-    res.statusCode = 400;
-    res.json({
+  if (Array.isArray(protocolHeader)) {
+    res.status(400).json({
       error: 'Unsupported protocol version. Expected either 0 or 1.',
     });
+    await logEvent('manifest_error', 400, {
+      message: 'Unsupported protocol version. Expected either 0 or 1.',
+    });
     return;
   }
-  const protocolVersion = parseInt(protocolVersionMaybeArray ?? '0', 10);
+  const parsedProtocolVersion = parseInt(getSingleValue(protocolHeader) ?? '0', 10);
+  const protocolVersion = Number.isFinite(parsedProtocolVersion) ? parsedProtocolVersion : 0;
 
-  const platform = req.headers['expo-platform'] ?? req.query['platform'];
   if (platform !== 'ios' && platform !== 'android') {
-    res.statusCode = 400;
-    res.json({
+    res.status(400).json({
       error: 'Unsupported platform. Expected either ios or android.',
     });
+    await logEvent('manifest_error', 400, {
+      message: 'Unsupported platform. Expected either ios or android.',
+    });
     return;
   }
 
-  const runtimeVersion = req.headers['expo-runtime-version'] ?? req.query['runtime-version'];
-  if (!runtimeVersion || typeof runtimeVersion !== 'string') {
-    res.statusCode = 400;
-    res.json({
+  if (!runtimeVersion) {
+    res.status(400).json({
       error: 'No runtimeVersion provided.',
     });
-    return;
-  }
-
-  let updateBundlePath: string;
-  try {
-    updateBundlePath = await getLatestUpdateBundlePathForRuntimeVersionAsync(runtimeVersion);
-  } catch (error: any) {
-    res.statusCode = 404;
-    res.json({
-      error: error.message,
+    await logEvent('manifest_error', 400, {
+      message: 'No runtimeVersion provided.',
     });
     return;
   }
 
-  const updateType = await getTypeOfUpdateAsync(updateBundlePath);
-
   try {
-    try {
-      if (updateType === UpdateType.NORMAL_UPDATE) {
-        await putUpdateInResponseAsync(
-          req,
-          res,
-          updateBundlePath,
-          runtimeVersion,
-          platform,
-          protocolVersion,
-        );
-      } else if (updateType === UpdateType.ROLLBACK) {
-        await putRollBackInResponseAsync(req, res, updateBundlePath, protocolVersion);
-      }
-    } catch (maybeNoUpdateAvailableError) {
-      if (maybeNoUpdateAvailableError instanceof NoUpdateAvailableError) {
-        await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion);
+    const resolution = resolveReleaseForRequest({
+      appSlug: context.appSlug,
+      channelName: context.channelName,
+      runtimeVersion,
+      deviceId: context.deviceId,
+    });
+
+    if (resolution.kind === 'rollback') {
+      await putRollBackDirectiveInResponseAsync(req, res, protocolVersion, resolution.policy.updatedAt);
+      await logEvent('manifest_rollback', res.statusCode, {
+        message: 'Rollback policy active',
+      });
+      return;
+    }
+
+    if (resolution.kind === 'no_update') {
+      if (resolution.reason === 'No release found for runtime') {
+        res.status(404).json({ error: 'Unsupported runtime version' });
+        await logEvent('manifest_error', 404, { message: resolution.reason });
         return;
       }
-      throw maybeNoUpdateAvailableError;
+      await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion);
+      await logEvent('manifest_no_update', res.statusCode, {
+        message: resolution.reason,
+      });
+      return;
     }
+
+    const release = resolution.release;
+    if (release.isRollback) {
+      await putRollBackInResponseAsync(req, res, release.updatePath, protocolVersion);
+      await logEvent('manifest_rollback', res.statusCode, {
+        bundlePath: release.updatePath,
+      });
+      return;
+    }
+
+    const result = await putUpdateInResponseAsync(
+      req,
+      res,
+      release.updatePath,
+      runtimeVersion,
+      platform,
+      protocolVersion,
+    );
+
+    await logEvent('manifest_update', res.statusCode, {
+      updateId: result.manifestId,
+      bundlePath: release.updatePath,
+    });
   } catch (error) {
+    if (error instanceof NoUpdateAvailableError) {
+      try {
+        await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion);
+        await logEvent('manifest_no_update', res.statusCode, {
+          message: 'Client already on latest update',
+        });
+      } catch (directiveError) {
+        res.status(500).json({
+          error: directiveError instanceof Error ? directiveError.message : 'Failed to emit no-update directive',
+        });
+        await logEvent('manifest_error', 500, {
+          message:
+            directiveError instanceof Error
+              ? directiveError.message
+              : 'Failed to emit no-update directive',
+        });
+      }
+      return;
+    }
     console.error(error);
-    res.statusCode = 404;
-    res.json({ error });
+    res.status(404).json({
+      error: error instanceof Error ? error.message : 'Manifest processing failed',
+    });
+    await logEvent('manifest_error', 404, {
+      message: error instanceof Error ? error.message : 'Manifest processing failed',
+    });
   }
-}
-
-enum UpdateType {
-  NORMAL_UPDATE,
-  ROLLBACK,
-}
-
-async function getTypeOfUpdateAsync(updateBundlePath: string): Promise<UpdateType> {
-  const directoryContents = await fs.readdir(updateBundlePath);
-  return directoryContents.includes('rollback') ? UpdateType.ROLLBACK : UpdateType.NORMAL_UPDATE;
 }
 
 async function putUpdateInResponseAsync(
@@ -110,15 +185,13 @@ async function putUpdateInResponseAsync(
   runtimeVersion: string,
   platform: string,
   protocolVersion: number,
-): Promise<void> {
+): Promise<{ manifestId: string }> {
   const currentUpdateId = req.headers['expo-current-update-id'];
   const { metadataJson, createdAt, id } = await getMetadataAsync({
     updateBundlePath,
     runtimeVersion,
   });
 
-  // NoUpdateAvailable directive only supported on protocol version 1
-  // for protocol version 0, serve most recent update as normal
   if (currentUpdateId === convertSHA256HashToUUID(id) && protocolVersion === 1) {
     throw new NoUpdateAvailableError();
   }
@@ -163,11 +236,10 @@ async function putUpdateInResponseAsync(
   if (expectSignatureHeader) {
     const privateKey = await getPrivateKeyAsync();
     if (!privateKey) {
-      res.statusCode = 400;
-      res.json({
+      res.status(400).json({
         error: 'Code signing requested but no key supplied when starting server.',
       });
-      return;
+      return { manifestId: manifest.id };
     }
     const manifestString = JSON.stringify(manifest);
     const hashSignature = signRSASHA256(manifestString, privateKey);
@@ -204,6 +276,7 @@ async function putUpdateInResponseAsync(
   res.setHeader('content-type', `multipart/mixed; boundary=${form.getBoundary()}`);
   res.write(form.getBuffer());
   res.end();
+  return { manifestId: manifest.id };
 }
 
 async function putRollBackInResponseAsync(
@@ -227,43 +300,37 @@ async function putRollBackInResponseAsync(
   }
 
   const directive = await createRollBackDirectiveAsync(updateBundlePath);
+  await sendDirectiveAsync(req, res, directive, 1);
+}
 
-  let signature = null;
-  const expectSignatureHeader = req.headers['expo-expect-signature'];
-  if (expectSignatureHeader) {
-    const privateKey = await getPrivateKeyAsync();
-    if (!privateKey) {
-      res.statusCode = 400;
-      res.json({
-        error: 'Code signing requested but no key supplied when starting server.',
-      });
-      return;
-    }
-    const directiveString = JSON.stringify(directive);
-    const hashSignature = signRSASHA256(directiveString, privateKey);
-    const dictionary = convertToDictionaryItemsRepresentation({
-      sig: hashSignature,
-      keyid: 'main',
-    });
-    signature = serializeDictionary(dictionary);
+async function putRollBackDirectiveInResponseAsync(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  protocolVersion: number,
+  commitTime: string,
+): Promise<void> {
+  if (protocolVersion === 0) {
+    throw new Error('Rollbacks not supported on protocol version 0');
   }
 
-  const form = new FormData();
-  form.append('directive', JSON.stringify(directive), {
-    contentType: 'application/json',
-    header: {
-      'content-type': 'application/json; charset=utf-8',
-      ...(signature ? { 'expo-signature': signature } : {}),
-    },
-  });
+  const embeddedUpdateId = req.headers['expo-embedded-update-id'];
+  if (!embeddedUpdateId || typeof embeddedUpdateId !== 'string') {
+    throw new Error('Invalid Expo-Embedded-Update-ID request header specified.');
+  }
 
-  res.statusCode = 200;
-  res.setHeader('expo-protocol-version', 1);
-  res.setHeader('expo-sfv-version', 0);
-  res.setHeader('cache-control', 'private, max-age=0');
-  res.setHeader('content-type', `multipart/mixed; boundary=${form.getBoundary()}`);
-  res.write(form.getBuffer());
-  res.end();
+  const currentUpdateId = req.headers['expo-current-update-id'];
+  if (currentUpdateId === embeddedUpdateId) {
+    throw new NoUpdateAvailableError();
+  }
+
+  const directive = {
+    type: 'rollBackToEmbedded',
+    parameters: {
+      commitTime,
+    },
+  };
+
+  await sendDirectiveAsync(req, res, directive, 1);
 }
 
 async function putNoUpdateAvailableInResponseAsync(
@@ -276,7 +343,15 @@ async function putNoUpdateAvailableInResponseAsync(
   }
 
   const directive = await createNoUpdateAvailableDirectiveAsync();
+  await sendDirectiveAsync(req, res, directive, 1);
+}
 
+async function sendDirectiveAsync(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  directive: object,
+  protocolVersion: number,
+): Promise<void> {
   let signature = null;
   const expectSignatureHeader = req.headers['expo-expect-signature'];
   if (expectSignatureHeader) {
@@ -307,7 +382,7 @@ async function putNoUpdateAvailableInResponseAsync(
   });
 
   res.statusCode = 200;
-  res.setHeader('expo-protocol-version', 1);
+  res.setHeader('expo-protocol-version', protocolVersion);
   res.setHeader('expo-sfv-version', 0);
   res.setHeader('cache-control', 'private, max-age=0');
   res.setHeader('content-type', `multipart/mixed; boundary=${form.getBoundary()}`);

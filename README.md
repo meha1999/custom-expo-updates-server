@@ -67,3 +67,63 @@ In the simulator running the "release" version of the app, force close the app a
 This server was created with NextJS. You can find the API endpoints in **pages/api/manifest.js** and **pages/api/assets.js**.
 
 The code signing keys and certificates were generated using https://github.com/expo/code-signing-certificates.
+
+## Dashboard and telemetry
+
+The `expo-updates-server` app now includes a built-in dashboard at `/` and an API endpoint at `/api/dashboard`.
+
+- The dashboard API aggregates:
+  - request logs from `/api/manifest`, `/api/assets`, and telemetry endpoints
+  - update bundle inventory from `expo-updates-server/updates/*/*`
+  - device-level activity (`x-device-id`, `expo-device-id`, `expo-client-id`, or fallback fingerprint)
+
+## Control plane features
+
+This fork now includes:
+
+1. Authentication and role-based access (admin/viewer) for dashboard and admin APIs.
+2. Real device tracking with first/last seen and request counters.
+3. Multi-app support (`appSlug`) and deployment channels (`channelName`).
+4. Gradual rollouts with percentage, allowlist, and blocklist.
+5. Update health ACK ingestion (`downloaded` / `applied` / `failed` / `rolled_back`).
+6. Advanced logs with filters, pagination, and CSV export.
+7. Release operations APIs for register/publish, promote, and rollback.
+   - Actions are written to `admin_audit_logs` and shown in dashboard audit trail.
+8. API key management with scopes for secure ingestion endpoints.
+9. SQLite storage (`expo-updates-server/data/control-plane.sqlite`) replacing JSON event storage.
+   - Includes `users`, `sessions`, `apps`, `channels`, `releases`, `channel_runtime_policies`, `devices`, `request_logs`, `update_acks`, and `admin_audit_logs`.
+
+## Default credentials
+
+- Username: `admin`
+- Password: `change-me-now`
+
+Override via environment variables:
+
+- `DASHBOARD_ADMIN_USERNAME`
+- `DASHBOARD_ADMIN_PASSWORD`
+
+## Admin API overview
+
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET|POST /api/admin/apps`
+- `GET|POST|PUT /api/admin/channels`
+- `GET|POST /api/admin/releases`
+- `POST /api/admin/promote`
+- `POST /api/admin/rollback`
+- `GET /api/admin/logs` (supports `format=csv`)
+- `GET|POST|DELETE /api/admin/api-keys`
+
+## Telemetry ingestion (API key required)
+
+- `POST /api/telemetry/ack` with `x-api-key` or `Authorization: Bearer <key>`
+  - Supports statuses `downloaded`, `applied`, `failed`, `rolled_back`, plus `reason` and `crashSignal`.
+- `POST /api/telemetry/log` with `x-api-key` or `Authorization: Bearer <key>`
+
+Suggested API key scopes:
+
+- `telemetry:write` for ACK events
+- `logs:write` for external log ingestion
+- `admin` for full access
