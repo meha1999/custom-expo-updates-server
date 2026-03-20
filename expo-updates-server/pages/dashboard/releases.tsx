@@ -183,11 +183,11 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
               <form className="grid gap-3 md:grid-cols-2" onSubmit={(event) => void handleRegisterRelease(event)}>
                 <div className="space-y-1">
                   <FieldLabel label={t(locale, 'releases.register.runtimeVersion')} hint={hints.runtimeVersion} />
-                <Input value={runtimeVersion} onChange={(event) => setRuntimeVersion(event.target.value)} placeholder={t(locale, 'releases.register.runtimeVersion')} required />
+                  <Input value={runtimeVersion} onChange={(event) => setRuntimeVersion(event.target.value)} placeholder={t(locale, 'releases.register.runtimeVersion')} required />
                 </div>
                 <div className="space-y-1">
                   <FieldLabel label={t(locale, 'releases.register.bundleId')} hint={hints.bundleId} />
-                <Input value={bundleId} onChange={(event) => setBundleId(event.target.value)} placeholder={t(locale, 'releases.register.bundleId')} required />
+                  <Input value={bundleId} onChange={(event) => setBundleId(event.target.value)} placeholder={t(locale, 'releases.register.bundleId')} required />
                 </div>
                 <div className="space-y-1">
                   <FieldLabel label={t(locale, 'releases.register.channel')} hint={hints.channel} />
@@ -201,7 +201,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                 </div>
                 <div className="space-y-1">
                   <FieldLabel label={t(locale, 'releases.register.rollout')} hint={hints.rollout} />
-                <Input type="number" min={0} max={100} value={rolloutPercentage} onChange={(event) => setRolloutPercentage(Number(event.target.value))} placeholder={t(locale, 'releases.register.rollout')} required />
+                  <Input type="number" min={0} max={100} value={rolloutPercentage} onChange={(event) => setRolloutPercentage(Number(event.target.value))} placeholder={t(locale, 'releases.register.rollout')} required />
                 </div>
                 <div className="space-y-1 md:col-span-2">
                   <FieldLabel label={t(locale, 'releases.register.allowlist')} hint={hints.allowlist} />

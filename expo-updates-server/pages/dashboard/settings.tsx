@@ -119,7 +119,7 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
                 <FieldLabel label={t(locale, 'settings.apps.appSlug')} hint={hints.appSlug} />
                 <Input value={appSlug} onChange={(event) => setAppSlug(event.target.value)} placeholder={t(locale, 'settings.apps.appSlug')} />
               </div>
-              <Button type="submit">{t(locale, 'settings.apps.create')}</Button>
+              <Button type="submit" className="self-end">{t(locale, 'settings.apps.create')}</Button>
             </form>
           ) : null}
           <div className="overflow-auto">
@@ -168,7 +168,7 @@ function SettingsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
                   <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
                 </Select>
               </div>
-              <Button type="submit">{t(locale, 'settings.users.create')}</Button>
+              <Button type="submit" className="self-end">{t(locale, 'settings.users.create')}</Button>
             </form>
           ) : (
             <p className="text-sm text-muted-foreground">{t(locale, 'settings.users.viewerReadOnly')}</p>

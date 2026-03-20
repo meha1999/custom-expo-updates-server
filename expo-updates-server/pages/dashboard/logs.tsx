@@ -99,7 +99,7 @@ function LogsContent({ appSlug }: { appSlug: string }) {
             <FieldLabel label={t(locale, 'logs.filters.statusCode')} hint={hints.status} />
             <Input value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} placeholder={t(locale, 'logs.filters.statusCode')} />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2 pb-0.5">
             <a href={exportUrl} className="text-sm text-primary underline underline-offset-4">{t(locale, 'logs.filters.exportCsv')}</a>
             <Button variant="outline" onClick={() => void load()}>{t(locale, 'logs.filters.refresh')}</Button>
           </div>

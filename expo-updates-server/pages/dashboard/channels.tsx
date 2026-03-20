@@ -149,7 +149,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                   <FieldLabel label={t(locale, 'channels.create.placeholder')} hint={hints.createChannel} />
                   <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder={t(locale, 'channels.create.placeholder')} required />
                 </div>
-                <Button type="submit">{t(locale, 'channels.create.button')}</Button>
+                <Button type="submit" className="self-end">{t(locale, 'channels.create.button')}</Button>
               </form>
             </CardContent>
           </Card>

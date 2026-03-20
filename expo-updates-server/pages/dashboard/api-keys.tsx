@@ -121,7 +121,7 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
               <FieldLabel label={t(locale, 'apiKeys.create.keyName')} hint={hints.keyName} />
               <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'apiKeys.create.keyName')} required />
             </div>
-            <div className="md:col-span-2 flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
+            <div className="md:col-span-2 flex flex-wrap items-start gap-3 rounded-md border border-border p-3">
               <FieldLabel
                 label={locale === 'fa' ? 'دسترسی‌ها' : 'Scopes'}
                 hint={hints.scopes}

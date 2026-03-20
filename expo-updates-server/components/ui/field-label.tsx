@@ -9,8 +9,11 @@ interface FieldLabelProps extends HTMLAttributes<HTMLDivElement> {
 
 export function FieldLabel({ label, hint, htmlFor, className, ...props }: FieldLabelProps) {
   return (
-    <div className={cn('mb-1 flex items-center gap-1.5', className)} {...props}>
-      <label htmlFor={htmlFor} className="text-xs font-medium text-muted-foreground">
+    <div className={cn('flex min-w-0 items-center gap-1.5', className)} {...props}>
+      <label
+        htmlFor={htmlFor}
+        className="max-w-[calc(100%-1.25rem)] truncate whitespace-nowrap text-xs font-medium text-muted-foreground"
+      >
         {label}
       </label>
       <span className="group relative inline-flex">
@@ -22,7 +25,10 @@ export function FieldLabel({ label, hint, htmlFor, className, ...props }: FieldL
         >
           ?
         </span>
-        <span className="pointer-events-none absolute top-6 z-50 w-56 rounded-md border border-border bg-white p-2 text-[11px] leading-4 text-foreground opacity-0 shadow-soft transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <span
+          className="pointer-events-none absolute top-6 z-50 w-56 rounded-md border border-border bg-white p-2 text-[11px] leading-4 text-foreground opacity-0 shadow-soft transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+          style={{ insetInlineStart: 0 }}
+        >
           {hint}
         </span>
       </span>

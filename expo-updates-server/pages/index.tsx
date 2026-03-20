@@ -91,15 +91,17 @@ export default function LoginPage() {
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Expo</p>
               <div className="w-28">
-                <FieldLabel
-                  label={t(locale, 'shell.language')}
-                  hint={hints.language}
-                  className="justify-end"
-                />
-                <Select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-                  <option value="en">{t(locale, 'shell.english')}</option>
-                  <option value="fa">{t(locale, 'shell.persian')}</option>
-                </Select>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label={t(locale, 'shell.language')}
+                    hint={hints.language}
+                    className="justify-end"
+                  />
+                  <Select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+                    <option value="en">{t(locale, 'shell.english')}</option>
+                    <option value="fa">{t(locale, 'shell.persian')}</option>
+                  </Select>
+                </div>
               </div>
             </div>
             <CardTitle className="text-xl">{t(locale, 'login.heading')}</CardTitle>
@@ -107,23 +109,27 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form className="space-y-3" onSubmit={handleSubmit}>
-              <FieldLabel label={t(locale, 'login.username')} hint={hints.username} />
-              <Input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder={t(locale, 'login.username')}
-                autoComplete="username"
-                required
-              />
-              <FieldLabel label={t(locale, 'login.password')} hint={hints.password} />
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={t(locale, 'login.password')}
-                autoComplete="current-password"
-                required
-              />
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'login.username')} hint={hints.username} />
+                <Input
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder={t(locale, 'login.username')}
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'login.password')} hint={hints.password} />
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={t(locale, 'login.password')}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
               {error ? <p className="text-sm text-danger">{error}</p> : null}
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? t(locale, 'login.signingIn') : t(locale, 'login.signIn')}

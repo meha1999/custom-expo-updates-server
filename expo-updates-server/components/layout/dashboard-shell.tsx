@@ -148,9 +148,9 @@ export function DashboardShell({
                 {t(locale, 'shell.openMenu')}
               </button>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <div className="min-w-[180px]">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="min-w-[180px] space-y-1">
                   <FieldLabel label={t(locale, 'shell.activeApp')} hint={hints.activeApp} />
                   <Select value={appSlug} onChange={(event) => void onChangeApp(event.target.value)}>
                     {apps.map((app) => (
@@ -161,8 +161,8 @@ export function DashboardShell({
                   </Select>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="min-w-[130px]">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-[130px] space-y-1">
                   <FieldLabel label={t(locale, 'shell.language')} hint={hints.language} />
                   <Select
                     value={locale}
@@ -173,7 +173,7 @@ export function DashboardShell({
                     <option value="fa">{t(locale, 'shell.persian')}</option>
                   </Select>
                 </div>
-                <Button variant="outline" onClick={() => void onLogout()}>
+                <Button variant="outline" className="self-end" onClick={() => void onLogout()}>
                   {t(locale, 'shell.logout')}
                 </Button>
               </div>
