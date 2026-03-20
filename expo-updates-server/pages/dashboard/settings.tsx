@@ -6,6 +6,7 @@ import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
+import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
 import { t } from '../../lib/i18n';
@@ -42,6 +43,7 @@ function SettingsContent({
   refreshApps: () => Promise<void>;
 }) {
   const { locale } = useLocale();
+  const toast = useToast();
   const [apps, setApps] = useState<AppItem[]>([]);
   const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
@@ -54,6 +56,8 @@ function SettingsContent({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
+  const [creatingApp, setCreatingApp] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -98,6 +102,7 @@ function SettingsContent({
   async function handleCreateApp(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setCreatingApp(true);
       const created = await jsonFetch<AppItem>('/api/admin/apps', {
         method: 'POST',
         body: JSON.stringify({ name: appName, slug: appSlugInput || undefined }),
@@ -113,14 +118,21 @@ function SettingsContent({
         `/api/admin/channels?app=${encodeURIComponent(created.slug)}`,
       );
       setChannels(createdChannels.channels);
+      toast.success(locale === 'fa' ? 'اپ جدید با موفقیت ایجاد شد.' : 'App created successfully.');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad'));
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCreatingApp(false);
     }
   }
 
   async function handleCreateUser(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setCreatingUser(true);
       await jsonFetch('/api/admin/users', {
         method: 'POST',
         body: JSON.stringify({ username, password, role }),
@@ -128,8 +140,14 @@ function SettingsContent({
       setUsername('');
       setPassword('');
       await load();
+      toast.success(locale === 'fa' ? 'کاربر جدید ایجاد شد.' : 'User created successfully.');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad'));
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCreatingUser(false);
     }
   }
 
@@ -147,8 +165,10 @@ function SettingsContent({
     try {
       await navigator.clipboard.writeText(value);
       setCopiedKey(key);
+      toast.success(locale === 'fa' ? 'URL کپی شد.' : 'URL copied.');
     } catch {
       setCopiedKey(null);
+      toast.error(locale === 'fa' ? 'کپی URL انجام نشد.' : 'Failed to copy URL.');
     }
   }
 
@@ -176,7 +196,14 @@ function SettingsContent({
                   placeholder={t(locale, 'settings.apps.appSlug')}
                 />
               </div>
-              <Button type="submit" className="self-end">{t(locale, 'settings.apps.create')}</Button>
+              <Button
+                type="submit"
+                className="self-end"
+                loading={creatingApp}
+                loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
+              >
+                {t(locale, 'settings.apps.create')}
+              </Button>
             </form>
           ) : null}
           {createdApp && manifestUrl ? (
@@ -301,7 +328,14 @@ function SettingsContent({
                   <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
                 </Select>
               </div>
-              <Button type="submit" className="self-end">{t(locale, 'settings.users.create')}</Button>
+              <Button
+                type="submit"
+                className="self-end"
+                loading={creatingUser}
+                loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
+              >
+                {t(locale, 'settings.users.create')}
+              </Button>
             </form>
           ) : (
             <p className="text-sm text-muted-foreground">{t(locale, 'settings.users.viewerReadOnly')}</p>

@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
+import { StatCard, StatLabel, StatValue } from '../../components/ui/stat';
 import { Table, Td, Th } from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
+import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
 import { formatDate, parseListInput } from '../../lib/format';
@@ -28,6 +30,7 @@ export default function ReleasesPage() {
 
 function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'admin' | 'viewer' }) {
   const { locale } = useLocale();
+  const toast = useToast();
   const [runtimeVersion, setRuntimeVersion] = useState('1');
   const [bundleId, setBundleId] = useState('');
   const [channelName, setChannelName] = useState('production');
@@ -44,6 +47,17 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [audit, setAudit] = useState<DashboardPayload['recentAuditLogs']>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [registeringRelease, setRegisteringRelease] = useState(false);
+  const [promotingRelease, setPromotingRelease] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+  const [uploadRuntimeVersion, setUploadRuntimeVersion] = useState('1');
+  const [uploadBundleId, setUploadBundleId] = useState('');
+  const [uploadChannelName, setUploadChannelName] = useState('production');
+  const [uploadRolloutPercentage, setUploadRolloutPercentage] = useState(100);
+  const [uploadAllowlist, setUploadAllowlist] = useState('');
+  const [uploadBlocklist, setUploadBlocklist] = useState('');
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -98,9 +112,54 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
     ]),
   );
 
+  const latestRelease = releases.length > 0 ? releases[0] : null;
+  const rollbackReleases = releases.filter((item) => item.isRollback).length;
+  const selectedUploadBytes = uploadFiles.reduce((sum, file) => sum + file.size, 0);
+
+  function normalizeUploadPath(file: File): string {
+    const withRelative = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
+    return (withRelative || file.name).replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  }
+
+  function stripCommonRoot(paths: string[]): string[] {
+    if (paths.length === 0) {
+      return paths;
+    }
+    const splitPaths = paths.map((value) => value.split('/').filter(Boolean));
+    const firstSegment = splitPaths[0]?.[0];
+    if (!firstSegment) {
+      return paths;
+    }
+    const hasSingleRoot = splitPaths.every((segments) => segments.length > 1 && segments[0] === firstSegment);
+    if (!hasSingleRoot) {
+      return paths;
+    }
+    return splitPaths.map((segments) => segments.slice(1).join('/'));
+  }
+
+  async function encodeFileToBase64(file: File): Promise<string> {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      const chunk = bytes.subarray(offset, offset + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    return btoa(binary);
+  }
+
+  function handleUploadFileSelection(fileList: FileList | null): void {
+    if (!fileList) {
+      setUploadFiles([]);
+      return;
+    }
+    setUploadFiles(Array.from(fileList));
+  }
+
   async function handleRegisterRelease(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setRegisteringRelease(true);
       await jsonFetch('/api/admin/releases', {
         method: 'POST',
         body: JSON.stringify({
@@ -114,16 +173,88 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
         }),
       });
       setBundleId('');
-      setMessage(t(locale, 'releases.successRegister'));
+      const success = t(locale, 'releases.successRegister');
+      setMessage(success);
+      toast.success(success);
       await loadData();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'releases.failedLoad'));
+      const failure =
+        submitError instanceof Error ? submitError.message : t(locale, 'releases.failedLoad');
+      setError(failure);
+      toast.error(failure);
+    } finally {
+      setRegisteringRelease(false);
+    }
+  }
+
+  async function handleUploadRelease(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!uploadRuntimeVersion.trim() || !uploadBundleId.trim()) {
+      const failure =
+        locale === 'fa'
+          ? 'Runtime Version و Bundle ID برای آپلود الزامی هستند.'
+          : 'Runtime version and bundle ID are required for upload.';
+      setError(failure);
+      toast.error(failure);
+      return;
+    }
+    if (uploadFiles.length === 0) {
+      const failure =
+        locale === 'fa'
+          ? 'حداقل یک فایل برای آپلود انتخاب کنید.'
+          : 'Select at least one file to upload.';
+      setError(failure);
+      toast.error(failure);
+      return;
+    }
+
+    try {
+      setUploadingFiles(true);
+      const normalizedPaths = uploadFiles.map((file) => normalizeUploadPath(file));
+      const finalPaths = stripCommonRoot(normalizedPaths);
+      const files = await Promise.all(
+        uploadFiles.map(async (file, index) => ({
+          path: finalPaths[index] ?? normalizeUploadPath(file),
+          contentBase64: await encodeFileToBase64(file),
+        })),
+      );
+
+      await jsonFetch('/api/admin/upload-release', {
+        method: 'POST',
+        body: JSON.stringify({
+          appSlug,
+          runtimeVersion: uploadRuntimeVersion.trim(),
+          bundleId: uploadBundleId.trim(),
+          channelName: uploadChannelName,
+          rolloutPercentage: uploadRolloutPercentage,
+          allowlist: parseListInput(uploadAllowlist),
+          blocklist: parseListInput(uploadBlocklist),
+          files,
+        }),
+      });
+
+      setUploadFiles([]);
+      const success =
+        locale === 'fa'
+          ? 'فایل‌های آپدیت آپلود و نسخه ثبت شد.'
+          : 'Update files uploaded and release registered.';
+      setMessage(success);
+      toast.success(success);
+      await loadData();
+    } catch (uploadError) {
+      const failure =
+        uploadError instanceof Error ? uploadError.message : t(locale, 'releases.failedLoad');
+      setError(failure);
+      toast.error(failure);
+    } finally {
+      setUploadingFiles(false);
     }
   }
 
   async function handlePromote(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setPromotingRelease(true);
       await jsonFetch('/api/admin/promote', {
         method: 'POST',
         body: JSON.stringify({
@@ -133,16 +264,35 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
           runtimeVersion,
         }),
       });
-      setMessage(t(locale, 'releases.successPromote'));
+      const success = t(locale, 'releases.successPromote');
+      setMessage(success);
+      toast.success(success);
       await loadData();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'releases.failedLoad'));
+      const failure =
+        submitError instanceof Error ? submitError.message : t(locale, 'releases.failedLoad');
+      setError(failure);
+      toast.error(failure);
+    } finally {
+      setPromotingRelease(false);
     }
   }
 
   async function handleRollback(event: FormEvent): Promise<void> {
     event.preventDefault();
+    const confirmed =
+      typeof window === 'undefined'
+        ? true
+        : window.confirm(
+            locale === 'fa'
+              ? 'آیا از فعال‌سازی بازگشت به نسخه embedded مطمئن هستید؟'
+              : 'Are you sure you want to enable rollback to embedded?',
+          );
+    if (!confirmed) {
+      return;
+    }
     try {
+      setRollingBack(true);
       await jsonFetch('/api/admin/rollback', {
         method: 'POST',
         body: JSON.stringify({
@@ -151,15 +301,46 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
           runtimeVersion,
         }),
       });
-      setMessage(t(locale, 'releases.successRollback'));
+      const success = t(locale, 'releases.successRollback');
+      setMessage(success);
+      toast.success(success);
       await loadData();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'releases.failedLoad'));
+      const failure =
+        submitError instanceof Error ? submitError.message : t(locale, 'releases.failedLoad');
+      setError(failure);
+      toast.error(failure);
+    } finally {
+      setRollingBack(false);
     }
   }
 
   return (
     <div className="space-y-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'کل نسخه‌ها' : 'Total releases'}</StatLabel>
+          <StatValue>{releases.length}</StatValue>
+        </StatCard>
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'نسخه‌های rollback' : 'Rollback releases'}</StatLabel>
+          <StatValue>{rollbackReleases}</StatValue>
+        </StatCard>
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'کانال‌های فعال' : 'Available channels'}</StatLabel>
+          <StatValue>{channelOptions.length}</StatValue>
+        </StatCard>
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'آخرین انتشار' : 'Latest release'}</StatLabel>
+          <StatValue className="text-base">
+            {latestRelease ? `${latestRelease.runtimeVersion}/${latestRelease.bundleId}` : '-'}
+          </StatValue>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {latestRelease ? formatDate(latestRelease.createdAt, locale) : ''}
+          </p>
+        </StatCard>
+      </section>
+
       {error ? (
         <Card>
           <CardContent className="py-3 text-sm text-danger">{error}</CardContent>
@@ -172,8 +353,8 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       ) : null}
 
       {userRole === 'admin' ? (
-        <section className="grid gap-4 xl:grid-cols-3">
-          <Card className="xl:col-span-2">
+        <section className="grid items-start gap-4 xl:grid-cols-12">
+          <Card className="xl:col-span-7">
             <CardHeader>
               <CardTitle>{t(locale, 'releases.register.title')}</CardTitle>
               <CardDescription>{t(locale, 'releases.register.description')}</CardDescription>
@@ -211,13 +392,19 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                   <Textarea value={blocklist} onChange={(event) => setBlocklist(event.target.value)} placeholder={t(locale, 'releases.register.blocklist')} className="md:col-span-2" />
                 </div>
                 <div className="md:col-span-2">
-                  <Button type="submit">{t(locale, 'releases.register.button')}</Button>
+                  <Button
+                    type="submit"
+                    loading={registeringRelease}
+                    loadingText={locale === 'fa' ? 'در حال ثبت...' : 'Registering...'}
+                  >
+                    {t(locale, 'releases.register.button')}
+                  </Button>
                 </div>
               </form>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="xl:col-span-5">
             <CardHeader>
               <CardTitle>{t(locale, 'releases.ops.title')}</CardTitle>
             </CardHeader>
@@ -243,7 +430,14 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                     ))}
                   </Select>
                 </div>
-                <Button type="submit" variant="secondary">{t(locale, 'releases.ops.promoteButton')}</Button>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  loading={promotingRelease}
+                  loadingText={locale === 'fa' ? 'در حال پروموت...' : 'Promoting...'}
+                >
+                  {t(locale, 'releases.ops.promoteButton')}
+                </Button>
               </form>
               <form className="space-y-2" onSubmit={(event) => void handleRollback(event)}>
                 <div className="space-y-1">
@@ -256,7 +450,158 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                     ))}
                   </Select>
                 </div>
-                <Button type="submit" variant="destructive">{t(locale, 'releases.ops.rollbackButton')}</Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  loading={rollingBack}
+                  loadingText={locale === 'fa' ? 'در حال بازگشت...' : 'Rolling back...'}
+                >
+                  {t(locale, 'releases.ops.rollbackButton')}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-12">
+            <CardHeader>
+              <CardTitle>{locale === 'fa' ? 'آپلود فایل‌های آپدیت' : 'Upload Update Files'}</CardTitle>
+              <CardDescription>
+                {locale === 'fa'
+                  ? 'پوشه خروجی آپدیت (metadata.json، expoConfig.json، bundles و assets) را مستقیم آپلود کنید. بعد از آپلود، نسخه ثبت و روی کانال انتخابی اعمال می‌شود.'
+                  : 'Upload an exported update folder (metadata.json, expoConfig.json, bundles, assets). After upload, the release is registered and assigned to the selected channel.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={(event) => void handleUploadRelease(event)}>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'Runtime Version' : 'Runtime Version'}
+                    hint={
+                      locale === 'fa'
+                        ? 'مسیر ذخیره فایل‌ها: updates/<runtime>/<bundle>'
+                        : 'Files are stored under updates/<runtime>/<bundle>.'
+                    }
+                  />
+                  <Input
+                    value={uploadRuntimeVersion}
+                    onChange={(event) => setUploadRuntimeVersion(event.target.value)}
+                    placeholder={locale === 'fa' ? 'مثال: test یا 1' : 'e.g. test or 1'}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'Bundle ID' : 'Bundle ID'}
+                    hint={
+                      locale === 'fa'
+                        ? 'نام پوشه نسخه داخل Runtime.'
+                        : 'Release folder name inside the runtime directory.'
+                    }
+                  />
+                  <Input
+                    value={uploadBundleId}
+                    onChange={(event) => setUploadBundleId(event.target.value)}
+                    placeholder={locale === 'fa' ? 'مثال: 1 یا 17154400' : 'e.g. 1 or 17154400'}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'کانال مقصد' : 'Target Channel'}
+                    hint={
+                      locale === 'fa'
+                        ? 'نسخه بعد از آپلود روی این کانال فعال می‌شود.'
+                        : 'Release is assigned to this channel immediately after upload.'
+                    }
+                  />
+                  <Select value={uploadChannelName} onChange={(event) => setUploadChannelName(event.target.value)}>
+                    {channelOptions.map((channel) => (
+                      <option key={`upload-${channel}`} value={channel}>
+                        {channel}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'Rollout %' : 'Rollout %'}
+                    hint={
+                      locale === 'fa'
+                        ? 'درصد دستگاه‌های واجد شرایط برای دریافت نسخه.'
+                        : 'Percent of eligible devices that can receive the release.'
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={uploadRolloutPercentage}
+                    onChange={(event) => setUploadRolloutPercentage(Number(event.target.value))}
+                    placeholder="100"
+                    required
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'Allowlist (اختیاری)' : 'Allowlist (optional)'}
+                    hint={
+                      locale === 'fa'
+                        ? 'Device IDها را با comma یا خط جدید جدا کنید.'
+                        : 'Separate device IDs by comma or newline.'
+                    }
+                  />
+                  <Textarea
+                    value={uploadAllowlist}
+                    onChange={(event) => setUploadAllowlist(event.target.value)}
+                    placeholder={locale === 'fa' ? 'device-1, device-2' : 'device-1, device-2'}
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'Blocklist (اختیاری)' : 'Blocklist (optional)'}
+                    hint={
+                      locale === 'fa'
+                        ? 'Device IDهای این لیست آپدیت دریافت نمی‌کنند.'
+                        : 'Devices in this list are excluded from update delivery.'
+                    }
+                  />
+                  <Textarea
+                    value={uploadBlocklist}
+                    onChange={(event) => setUploadBlocklist(event.target.value)}
+                    placeholder={locale === 'fa' ? 'device-x, device-y' : 'device-x, device-y'}
+                  />
+                </div>
+                <div className="space-y-1 xl:col-span-4">
+                  <FieldLabel
+                    label={locale === 'fa' ? 'فایل‌ها/پوشه آپدیت' : 'Update Files/Folder'}
+                    hint={
+                      locale === 'fa'
+                        ? 'پوشه کامل آپدیت را انتخاب کنید. در مرورگرهایی که پشتیبانی ندارند، چند فایل را با هم انتخاب کنید.'
+                        : 'Select the full update folder. In unsupported browsers, select multiple files manually.'
+                    }
+                  />
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(event) => handleUploadFileSelection(event.target.files)}
+                    className="block w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
+                    {...({ webkitdirectory: 'true', directory: 'true' } as Record<string, string>)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'fa'
+                      ? `${uploadFiles.length} فایل انتخاب شده - ${(selectedUploadBytes / (1024 * 1024)).toFixed(2)} MB`
+                      : `${uploadFiles.length} file(s) selected - ${(selectedUploadBytes / (1024 * 1024)).toFixed(2)} MB`}
+                  </p>
+                </div>
+                <div className="xl:col-span-4">
+                  <Button
+                    type="submit"
+                    loading={uploadingFiles}
+                    loadingText={locale === 'fa' ? 'در حال آپلود...' : 'Uploading...'}
+                  >
+                    {locale === 'fa' ? 'آپلود و ثبت نسخه' : 'Upload And Register Release'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

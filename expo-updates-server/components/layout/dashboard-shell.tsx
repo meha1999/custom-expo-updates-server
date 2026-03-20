@@ -6,6 +6,7 @@ import { t } from '../../lib/i18n';
 import type { Locale } from '../../lib/i18n';
 import { AppItem, AuthUser } from '../../lib/types';
 import { cn } from '../../lib/utils';
+import { useToast } from '../providers/toast-provider';
 import { Button } from '../ui/button';
 import { FieldLabel } from '../ui/field-label';
 import { Select } from '../ui/select';
@@ -49,7 +50,10 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const router = useRouter();
   const { locale, isRtl, setLocale } = useLocale();
+  const toast = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [changingApp, setChangingApp] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -69,6 +73,44 @@ export function DashboardShell({
   );
 
   const navQuery = appSlug ? `?app=${encodeURIComponent(appSlug)}` : '';
+
+  async function handleChangeApp(nextAppSlug: string): Promise<void> {
+    if (!nextAppSlug || nextAppSlug === appSlug) {
+      return;
+    }
+    try {
+      setChangingApp(true);
+      await onChangeApp(nextAppSlug);
+      toast.info(locale === 'fa' ? 'اپ فعال تغییر کرد.' : 'Active app changed.');
+    } catch (changeError) {
+      const message =
+        changeError instanceof Error
+          ? changeError.message
+          : locale === 'fa'
+            ? 'تغییر اپ فعال انجام نشد.'
+            : 'Failed to change active app.';
+      toast.error(message);
+    } finally {
+      setChangingApp(false);
+    }
+  }
+
+  async function handleLogout(): Promise<void> {
+    try {
+      setLoggingOut(true);
+      await onLogout();
+    } catch (logoutError) {
+      const message =
+        logoutError instanceof Error
+          ? logoutError.message
+          : locale === 'fa'
+            ? 'خروج انجام نشد.'
+            : 'Logout failed.';
+      toast.error(message);
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -152,7 +194,11 @@ export function DashboardShell({
               <div>
                 <div className="min-w-[180px] space-y-1">
                   <FieldLabel label={t(locale, 'shell.activeApp')} hint={hints.activeApp} />
-                  <Select value={appSlug} onChange={(event) => void onChangeApp(event.target.value)}>
+                  <Select
+                    value={appSlug}
+                    onChange={(event) => void handleChangeApp(event.target.value)}
+                    disabled={changingApp}
+                  >
                     {apps.map((app) => (
                       <option key={app.id} value={app.slug}>
                         {app.name} ({app.slug})
@@ -173,7 +219,13 @@ export function DashboardShell({
                     <option value="fa">{t(locale, 'shell.persian')}</option>
                   </Select>
                 </div>
-                <Button variant="outline" className="self-end" onClick={() => void onLogout()}>
+                <Button
+                  variant="outline"
+                  className="self-end"
+                  onClick={() => void handleLogout()}
+                  loading={loggingOut}
+                  loadingText={locale === 'fa' ? 'در حال خروج...' : 'Signing out...'}
+                >
                   {t(locale, 'shell.logout')}
                 </Button>
               </div>

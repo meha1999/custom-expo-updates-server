@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
+import { StatCard, StatLabel, StatValue } from '../../components/ui/stat';
 import { Table, Td, Th } from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
+import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
 import { parseListInput } from '../../lib/format';
@@ -28,6 +30,7 @@ export default function ChannelsPage() {
 
 function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'admin' | 'viewer' }) {
   const { locale } = useLocale();
+  const toast = useToast();
   const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [policies, setPolicies] = useState<PolicyItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +45,8 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [policyAllowlist, setPolicyAllowlist] = useState('');
   const [policyBlocklist, setPolicyBlocklist] = useState('');
   const [policyRollback, setPolicyRollback] = useState(false);
+  const [creatingChannel, setCreatingChannel] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -85,6 +90,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   async function handleCreateChannel(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setCreatingChannel(true);
       await jsonFetch('/api/admin/channels', {
         method: 'POST',
         body: JSON.stringify({
@@ -95,14 +101,21 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       setNewChannelName('');
       setMessage(t(locale, 'channels.successCreate'));
       await loadData();
+      toast.success(t(locale, 'channels.successCreate'));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'channels.failedLoad'));
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'channels.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCreatingChannel(false);
     }
   }
 
   async function handlePolicyUpdate(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setSavingPolicy(true);
       await jsonFetch('/api/admin/channels', {
         method: 'PUT',
         body: JSON.stringify({
@@ -118,8 +131,14 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       });
       setMessage(t(locale, 'channels.successPolicy'));
       await loadData();
+      toast.success(t(locale, 'channels.successPolicy'));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'channels.failedLoad'));
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'channels.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSavingPolicy(false);
     }
   }
 
@@ -130,30 +149,75 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       'development',
     ]),
   );
+  const rollbackPolicies = policies.filter((policy) => policy.rollbackToEmbedded).length;
+  const activePolicies = policies.length - rollbackPolicies;
 
   return (
     <div className="space-y-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'تعداد کانال‌ها' : 'Total channels'}</StatLabel>
+          <StatValue>{channels.length}</StatValue>
+        </StatCard>
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'Runtime Policyها' : 'Runtime policies'}</StatLabel>
+          <StatValue>{policies.length}</StatValue>
+        </StatCard>
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'Policy فعال' : 'Active policies'}</StatLabel>
+          <StatValue>{activePolicies}</StatValue>
+        </StatCard>
+        <StatCard>
+          <StatLabel>{locale === 'fa' ? 'Rollback Policy' : 'Rollback policies'}</StatLabel>
+          <StatValue>{rollbackPolicies}</StatValue>
+        </StatCard>
+      </section>
+
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       {message ? <p className="text-sm text-success">{message}</p> : null}
 
       {userRole === 'admin' ? (
-        <section className="grid gap-4 xl:grid-cols-2">
-          <Card>
+        <section className="grid items-start gap-4 xl:grid-cols-12">
+          <Card className="xl:col-span-4">
             <CardHeader>
               <CardTitle>{t(locale, 'channels.create.title')}</CardTitle>
+              <CardDescription>
+                {locale === 'fa'
+                  ? 'کانال‌ها مسیرهای انتشار جداگانه هستند. برای مثال development برای تست داخلی و production برای کاربران نهایی.'
+                  : 'Channels represent isolated release streams. Example: development for internal testing and production for public users.'}
+              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={(event) => void handleCreateChannel(event)}>
                 <div className="space-y-1">
                   <FieldLabel label={t(locale, 'channels.create.placeholder')} hint={hints.createChannel} />
                   <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder={t(locale, 'channels.create.placeholder')} required />
                 </div>
-                <Button type="submit" className="self-end">{t(locale, 'channels.create.button')}</Button>
+                <Button
+                  type="submit"
+                  className="self-end"
+                  loading={creatingChannel}
+                  loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
+                >
+                  {t(locale, 'channels.create.button')}
+                </Button>
               </form>
+              <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
+                <p className="text-xs font-medium">
+                  {locale === 'fa' ? 'کانال‌های فعلی اپ فعال' : 'Current channels for active app'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {channelOptions.map((channel) => (
+                    <Badge key={`existing-${channel}`} variant="muted">
+                      {channel}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="xl:col-span-8">
             <CardHeader>
               <CardTitle>{t(locale, 'channels.policy.title')}</CardTitle>
               <CardDescription>{t(locale, 'channels.policy.description')}</CardDescription>
@@ -197,7 +261,13 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                     {t(locale, 'channels.policy.rollback')}
                   </label>
                 </div>
-                <Button type="submit">{t(locale, 'channels.policy.button')}</Button>
+                <Button
+                  type="submit"
+                  loading={savingPolicy}
+                  loadingText={locale === 'fa' ? 'در حال ذخیره...' : 'Saving...'}
+                >
+                  {t(locale, 'channels.policy.button')}
+                </Button>
               </form>
             </CardContent>
           </Card>

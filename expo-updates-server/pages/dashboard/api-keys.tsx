@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Table, Td, Th } from '../../components/ui/table';
+import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
 import { t } from '../../lib/i18n';
@@ -27,11 +28,14 @@ export default function ApiKeysPage() {
 
 function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   const { locale } = useLocale();
+  const toast = useToast();
   const [items, setItems] = useState<ApiKeyItem[]>([]);
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<string[]>(['telemetry:write']);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [revokingKeyId, setRevokingKeyId] = useState<number | null>(null);
   const hints =
     locale === 'fa'
       ? {
@@ -61,6 +65,7 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   async function createKey(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
+      setCreatingKey(true);
       const payload = await jsonFetch<{ apiKey: string }>('/api/admin/api-keys', {
         method: 'POST',
         body: JSON.stringify({
@@ -71,20 +76,44 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
       setCreatedKey(payload.apiKey);
       setName('');
       await load();
+      toast.success(locale === 'fa' ? 'کلید API ایجاد شد.' : 'API key created.');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'apiKeys.failedLoad'));
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'apiKeys.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCreatingKey(false);
     }
   }
 
   async function revokeKey(id: number): Promise<void> {
+    const confirmed =
+      typeof window === 'undefined'
+        ? true
+        : window.confirm(
+            locale === 'fa'
+              ? 'آیا از لغو این کلید API مطمئن هستید؟'
+              : 'Are you sure you want to revoke this API key?',
+          );
+    if (!confirmed) {
+      return;
+    }
     try {
+      setRevokingKeyId(id);
       await jsonFetch('/api/admin/api-keys', {
         method: 'DELETE',
         body: JSON.stringify({ id }),
       });
       await load();
+      toast.success(locale === 'fa' ? 'کلید API لغو شد.' : 'API key revoked.');
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t(locale, 'apiKeys.failedLoad'));
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'apiKeys.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setRevokingKeyId(null);
     }
   }
 
@@ -135,7 +164,13 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
               ))}
             </div>
             <div className="md:col-span-3">
-              <Button type="submit">{t(locale, 'apiKeys.create.button')}</Button>
+              <Button
+                type="submit"
+                loading={creatingKey}
+                loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
+              >
+                {t(locale, 'apiKeys.create.button')}
+              </Button>
             </div>
           </form>
           {createdKey ? (
@@ -180,6 +215,8 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
                       size="sm"
                       variant="outline"
                       disabled={Boolean(item.revokedAt)}
+                      loading={revokingKeyId === item.id}
+                      loadingText={locale === 'fa' ? 'در حال لغو...' : 'Revoking...'}
                       onClick={() => void revokeKey(item.id)}
                     >
                       {t(locale, 'apiKeys.list.revoke')}

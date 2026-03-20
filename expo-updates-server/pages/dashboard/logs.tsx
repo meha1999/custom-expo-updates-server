@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
 import { Table, Td, Th } from '../../components/ui/table';
+import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
 import { formatDate } from '../../lib/format';
@@ -25,12 +26,14 @@ export default function LogsPage() {
 
 function LogsContent({ appSlug }: { appSlug: string }) {
   const { locale } = useLocale();
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [eventType, setEventType] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<LogResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -45,11 +48,12 @@ function LogsContent({ appSlug }: { appSlug: string }) {
         };
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [appSlug, search, eventType, status, page, locale]);
 
-  async function load(): Promise<void> {
+  async function load(showSuccessToast: boolean): Promise<void> {
     try {
+      setLoading(true);
       const params = new URLSearchParams({
         app: appSlug,
         page: String(page),
@@ -61,8 +65,15 @@ function LogsContent({ appSlug }: { appSlug: string }) {
       const payload = await jsonFetch<LogResponse>(`/api/admin/logs?${params.toString()}`);
       setData(payload);
       setError(null);
+      if (showSuccessToast) {
+        toast.info(locale === 'fa' ? 'لاگ‌ها به‌روزرسانی شدند.' : 'Logs refreshed.');
+      }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t(locale, 'logs.failedLoad'));
+      const message = loadError instanceof Error ? loadError.message : t(locale, 'logs.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -101,7 +112,14 @@ function LogsContent({ appSlug }: { appSlug: string }) {
           </div>
           <div className="flex items-end gap-2 pb-0.5">
             <a href={exportUrl} className="text-sm text-primary underline underline-offset-4">{t(locale, 'logs.filters.exportCsv')}</a>
-            <Button variant="outline" onClick={() => void load()}>{t(locale, 'logs.filters.refresh')}</Button>
+            <Button
+              variant="outline"
+              onClick={() => void load(true)}
+              loading={loading}
+              loadingText={locale === 'fa' ? 'در حال به‌روزرسانی...' : 'Refreshing...'}
+            >
+              {t(locale, 'logs.filters.refresh')}
+            </Button>
           </div>
         </CardContent>
       </Card>

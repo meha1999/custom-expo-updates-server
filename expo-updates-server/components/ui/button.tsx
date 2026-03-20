@@ -7,6 +7,8 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  loading?: boolean;
+  loadingText?: string;
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -24,13 +26,14 @@ const sizeClasses: Record<ButtonSize, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { className, variant = 'default', size = 'md', type = 'button', ...props },
+  { className, variant = 'default', size = 'md', type = 'button', loading = false, loadingText, children, disabled, ...props },
   ref,
 ) {
   return (
     <button
       ref={ref}
       type={type}
+      disabled={disabled || loading}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-md font-medium transition disabled:pointer-events-none disabled:opacity-50',
         variantClasses[variant],
@@ -38,6 +41,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         className,
       )}
       {...props}
-    />
+    >
+      {loading ? (
+        <>
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+          <span>{loadingText ?? children}</span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 });
