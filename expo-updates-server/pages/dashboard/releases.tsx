@@ -35,7 +35,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [allowlist, setAllowlist] = useState('');
   const [blocklist, setBlocklist] = useState('');
 
-  const [sourceChannel, setSourceChannel] = useState('staging');
+  const [sourceChannel, setSourceChannel] = useState('development');
   const [targetChannel, setTargetChannel] = useState('production');
   const [rollbackChannel, setRollbackChannel] = useState('production');
 
@@ -94,8 +94,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
     new Set([
       ...channels.map((channel) => channel.name),
       'production',
-      'staging',
-      'beta',
+      'development',
     ]),
   );
 

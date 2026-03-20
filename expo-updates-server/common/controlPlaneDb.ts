@@ -418,7 +418,7 @@ function seedDefaults(db: Database.Database): void {
 }
 
 function ensureDefaultChannels(db: Database.Database, appId: number, now: string): void {
-  const defaultChannels = ['production', 'staging', 'beta'];
+  const defaultChannels = ['production', 'development'];
   for (const channelName of defaultChannels) {
     db.prepare('INSERT OR IGNORE INTO channels (app_id, name, created_at) VALUES (?, ?, ?)').run(
       appId,

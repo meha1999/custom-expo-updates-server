@@ -9,7 +9,7 @@ import { Table, Td, Th } from '../../components/ui/table';
 import { useLocale } from '../../hooks/use-locale';
 import { jsonFetch } from '../../lib/http';
 import { t } from '../../lib/i18n';
-import { AppItem, AuthUser } from '../../lib/types';
+import { AppItem, AuthUser, ChannelItem } from '../../lib/types';
 
 export default function SettingsPage() {
   const { locale } = useLocale();
@@ -18,31 +18,39 @@ export default function SettingsPage() {
       title={t(locale, 'settings.title')}
       subtitle={t(locale, 'settings.subtitle')}
     >
-      {({ userRole, setApp, refreshApps }) => (
-        <SettingsContent userRole={userRole} setApp={setApp} refreshApps={refreshApps} />
+      {({ appSlug, userRole, setApp, refreshApps }) => (
+        <SettingsContent
+          activeAppSlug={appSlug}
+          userRole={userRole}
+          setApp={setApp}
+          refreshApps={refreshApps}
+        />
       )}
     </DashboardPage>
   );
 }
 
 function SettingsContent({
+  activeAppSlug,
   userRole,
   setApp,
   refreshApps,
 }: {
+  activeAppSlug: string;
   userRole: 'admin' | 'viewer';
   setApp: (slug: string) => Promise<void>;
   refreshApps: () => Promise<void>;
 }) {
   const { locale } = useLocale();
   const [apps, setApps] = useState<AppItem[]>([]);
+  const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [createdApp, setCreatedApp] = useState<AppItem | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const [appName, setAppName] = useState('');
-  const [appSlug, setAppSlug] = useState('');
+  const [appSlugInput, setAppSlugInput] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
@@ -65,12 +73,18 @@ function SettingsContent({
 
   useEffect(() => {
     void load();
-  }, [userRole, locale]);
+  }, [activeAppSlug, userRole, locale]);
 
   async function load(): Promise<void> {
     try {
-      const appResp = await jsonFetch<{ items: AppItem[] }>('/api/admin/apps');
+      const [appResp, channelResp] = await Promise.all([
+        jsonFetch<{ items: AppItem[] }>('/api/admin/apps'),
+        jsonFetch<{ channels: ChannelItem[] }>(
+          `/api/admin/channels?app=${encodeURIComponent(activeAppSlug)}`,
+        ),
+      ]);
       setApps(appResp.items);
+      setChannels(channelResp.channels);
       if (userRole === 'admin') {
         const userResp = await jsonFetch<{ items: AuthUser[] }>('/api/admin/users');
         setUsers(userResp.items);
@@ -86,15 +100,19 @@ function SettingsContent({
     try {
       const created = await jsonFetch<AppItem>('/api/admin/apps', {
         method: 'POST',
-        body: JSON.stringify({ name: appName, slug: appSlug || undefined }),
+        body: JSON.stringify({ name: appName, slug: appSlugInput || undefined }),
       });
       setCreatedApp(created);
-      setCopied(false);
+      setCopiedKey(null);
       setAppName('');
-      setAppSlug('');
+      setAppSlugInput('');
       await load();
       await refreshApps();
       await setApp(created.slug);
+      const createdChannels = await jsonFetch<{ channels: ChannelItem[] }>(
+        `/api/admin/channels?app=${encodeURIComponent(created.slug)}`,
+      );
+      setChannels(createdChannels.channels);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad'));
     }
@@ -115,21 +133,22 @@ function SettingsContent({
     }
   }
 
-  const manifestUrl = createdApp
-    ? `${
-        typeof window === 'undefined' ? '' : window.location.origin
-      }/api/manifest?app=${encodeURIComponent(createdApp.slug)}&channel=production`
-    : null;
+  function buildManifestUrl(targetAppSlug: string, channelName: string): string {
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    return `${origin}/api/manifest?app=${encodeURIComponent(targetAppSlug)}&channel=${encodeURIComponent(channelName)}`;
+  }
 
-  async function copyManifestUrl(): Promise<void> {
-    if (!manifestUrl || typeof navigator === 'undefined') {
+  const manifestUrl = createdApp ? buildManifestUrl(createdApp.slug, 'production') : null;
+
+  async function copyValue(value: string, key: string): Promise<void> {
+    if (!value || typeof navigator === 'undefined') {
       return;
     }
     try {
-      await navigator.clipboard.writeText(manifestUrl);
-      setCopied(true);
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
     } catch {
-      setCopied(false);
+      setCopiedKey(null);
     }
   }
 
@@ -151,7 +170,11 @@ function SettingsContent({
               </div>
               <div className="space-y-1">
                 <FieldLabel label={t(locale, 'settings.apps.appSlug')} hint={hints.appSlug} />
-                <Input value={appSlug} onChange={(event) => setAppSlug(event.target.value)} placeholder={t(locale, 'settings.apps.appSlug')} />
+                <Input
+                  value={appSlugInput}
+                  onChange={(event) => setAppSlugInput(event.target.value)}
+                  placeholder={t(locale, 'settings.apps.appSlug')}
+                />
               </div>
               <Button type="submit" className="self-end">{t(locale, 'settings.apps.create')}</Button>
             </form>
@@ -167,10 +190,10 @@ function SettingsContent({
                 {manifestUrl}
               </p>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => void copyManifestUrl()}>
+                <Button size="sm" variant="outline" onClick={() => void copyValue(manifestUrl, 'created')}>
                   {locale === 'fa' ? 'کپی URL' : 'Copy URL'}
                 </Button>
-                {copied ? (
+                {copiedKey === 'created' ? (
                   <span className="text-xs text-success">
                     {locale === 'fa' ? 'کپی شد' : 'Copied'}
                   </span>
@@ -183,6 +206,55 @@ function SettingsContent({
               </p>
             </div>
           ) : null}
+          <div className="space-y-2 rounded-md border border-border/70 bg-muted/40 p-3">
+            <p className="text-sm font-medium">
+              {locale === 'fa'
+                ? `URL آپدیت برای کانال‌های اپ ${activeAppSlug}`
+                : `Update URLs for ${activeAppSlug} channels`}
+            </p>
+            {channels.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {locale === 'fa' ? 'برای این اپ هنوز کانالی ثبت نشده است.' : 'No channels exist for this app yet.'}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {channels.map((channel) => {
+                  const channelUrl = buildManifestUrl(activeAppSlug, channel.name);
+                  const copyKey = `channel-${channel.id}`;
+                  return (
+                    <div
+                      key={channel.id}
+                      className="rounded border border-border bg-white px-2 py-2 text-xs"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="font-medium">{channel.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void copyValue(channelUrl, copyKey)}
+                          >
+                            {locale === 'fa' ? 'کپی URL' : 'Copy URL'}
+                          </Button>
+                          {copiedKey === copyKey ? (
+                            <span className="text-success">{locale === 'fa' ? 'کپی شد' : 'Copied'}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <p className="break-all rounded border border-border bg-muted px-2 py-1">
+                        {channelUrl}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {locale === 'fa'
+                ? 'برای هر محیط، URL کانال مناسب را داخل updates.url در اپ قرار دهید.'
+                : 'Use the matching channel URL in your app updates.url for each environment.'}
+            </p>
+          </div>
           <div className="overflow-auto">
             <Table>
               <thead>

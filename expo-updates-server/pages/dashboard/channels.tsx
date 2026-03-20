@@ -127,8 +127,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
     new Set([
       ...channels.map((channel) => channel.name),
       'production',
-      'staging',
-      'beta',
+      'development',
     ]),
   );
 
