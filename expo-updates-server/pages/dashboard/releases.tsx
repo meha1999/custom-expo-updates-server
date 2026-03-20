@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { StatCard, StatLabel, StatValue } from '../../components/ui/stat';
 import { Table, Td, Th } from '../../components/ui/table';
@@ -58,6 +59,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [uploadBlocklist, setUploadBlocklist] = useState('');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [showRegisterReleaseModal, setShowRegisterReleaseModal] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -173,6 +175,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
         }),
       });
       setBundleId('');
+      setShowRegisterReleaseModal(false);
       const success = t(locale, 'releases.successRegister');
       setMessage(success);
       toast.success(success);
@@ -359,50 +362,110 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
               <CardTitle>{t(locale, 'releases.register.title')}</CardTitle>
               <CardDescription>{t(locale, 'releases.register.description')}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form className="grid gap-3 md:grid-cols-2" onSubmit={(event) => void handleRegisterRelease(event)}>
-                <div className="space-y-1">
-                  <FieldLabel label={t(locale, 'releases.register.runtimeVersion')} hint={hints.runtimeVersion} />
-                  <Input value={runtimeVersion} onChange={(event) => setRuntimeVersion(event.target.value)} placeholder={t(locale, 'releases.register.runtimeVersion')} required />
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
+                <p className="text-sm text-muted-foreground">
+                  {locale === 'fa'
+                    ? 'فرم ثبت نسخه در پنجره جداگانه باز می‌شود.'
+                    : 'Open release registration in a modal and keep this page focused on operations.'}
+                </p>
+                <Button type="button" onClick={() => setShowRegisterReleaseModal(true)}>
+                  {t(locale, 'releases.register.button')}
+                </Button>
+              </div>
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-md border border-border bg-muted/20 p-2">
+                  <p className="font-medium">{t(locale, 'releases.register.runtimeVersion')}</p>
+                  <p>{runtimeVersion || '-'}</p>
                 </div>
-                <div className="space-y-1">
-                  <FieldLabel label={t(locale, 'releases.register.bundleId')} hint={hints.bundleId} />
-                  <Input value={bundleId} onChange={(event) => setBundleId(event.target.value)} placeholder={t(locale, 'releases.register.bundleId')} required />
+                <div className="rounded-md border border-border bg-muted/20 p-2">
+                  <p className="font-medium">{t(locale, 'releases.register.channel')}</p>
+                  <p>{channelName || '-'}</p>
                 </div>
-                <div className="space-y-1">
-                  <FieldLabel label={t(locale, 'releases.register.channel')} hint={hints.channel} />
-                  <Select value={channelName} onChange={(event) => setChannelName(event.target.value)}>
-                    {channelOptions.map((channel) => (
-                      <option key={`register-${channel}`} value={channel}>
-                        {channel}
-                      </option>
-                    ))}
-                  </Select>
+                <div className="rounded-md border border-border bg-muted/20 p-2">
+                  <p className="font-medium">{t(locale, 'releases.register.rollout')}</p>
+                  <p>{rolloutPercentage}%</p>
                 </div>
-                <div className="space-y-1">
-                  <FieldLabel label={t(locale, 'releases.register.rollout')} hint={hints.rollout} />
-                  <Input type="number" min={0} max={100} value={rolloutPercentage} onChange={(event) => setRolloutPercentage(Number(event.target.value))} placeholder={t(locale, 'releases.register.rollout')} required />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <FieldLabel label={t(locale, 'releases.register.allowlist')} hint={hints.allowlist} />
-                  <Textarea value={allowlist} onChange={(event) => setAllowlist(event.target.value)} placeholder={t(locale, 'releases.register.allowlist')} className="md:col-span-2" />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <FieldLabel label={t(locale, 'releases.register.blocklist')} hint={hints.blocklist} />
-                  <Textarea value={blocklist} onChange={(event) => setBlocklist(event.target.value)} placeholder={t(locale, 'releases.register.blocklist')} className="md:col-span-2" />
-                </div>
-                <div className="md:col-span-2">
-                  <Button
-                    type="submit"
-                    loading={registeringRelease}
-                    loadingText={locale === 'fa' ? 'در حال ثبت...' : 'Registering...'}
-                  >
-                    {t(locale, 'releases.register.button')}
-                  </Button>
-                </div>
-              </form>
+              </div>
             </CardContent>
           </Card>
+          <Modal
+            open={showRegisterReleaseModal}
+            onClose={() => setShowRegisterReleaseModal(false)}
+            title={t(locale, 'releases.register.title')}
+            description={t(locale, 'releases.register.description')}
+            widthClassName="max-w-4xl"
+          >
+            <form className="grid gap-3 md:grid-cols-2" onSubmit={(event) => void handleRegisterRelease(event)}>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'releases.register.runtimeVersion')} hint={hints.runtimeVersion} />
+                <Input
+                  value={runtimeVersion}
+                  onChange={(event) => setRuntimeVersion(event.target.value)}
+                  placeholder={t(locale, 'releases.register.runtimeVersion')}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'releases.register.bundleId')} hint={hints.bundleId} />
+                <Input
+                  value={bundleId}
+                  onChange={(event) => setBundleId(event.target.value)}
+                  placeholder={t(locale, 'releases.register.bundleId')}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'releases.register.channel')} hint={hints.channel} />
+                <Select value={channelName} onChange={(event) => setChannelName(event.target.value)}>
+                  {channelOptions.map((channel) => (
+                    <option key={`register-${channel}`} value={channel}>
+                      {channel}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <FieldLabel label={t(locale, 'releases.register.rollout')} hint={hints.rollout} />
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={rolloutPercentage}
+                  onChange={(event) => setRolloutPercentage(Number(event.target.value))}
+                  placeholder={t(locale, 'releases.register.rollout')}
+                  required
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <FieldLabel label={t(locale, 'releases.register.allowlist')} hint={hints.allowlist} />
+                <Textarea
+                  value={allowlist}
+                  onChange={(event) => setAllowlist(event.target.value)}
+                  placeholder={t(locale, 'releases.register.allowlist')}
+                  className="md:col-span-2"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <FieldLabel label={t(locale, 'releases.register.blocklist')} hint={hints.blocklist} />
+                <Textarea
+                  value={blocklist}
+                  onChange={(event) => setBlocklist(event.target.value)}
+                  placeholder={t(locale, 'releases.register.blocklist')}
+                  className="md:col-span-2"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Button
+                  type="submit"
+                  loading={registeringRelease}
+                  loadingText={locale === 'fa' ? 'در حال ثبت...' : 'Registering...'}
+                >
+                  {t(locale, 'releases.register.button')}
+                </Button>
+              </div>
+            </form>
+          </Modal>
 
           <Card className="xl:col-span-5">
             <CardHeader>

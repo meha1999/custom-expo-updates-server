@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
@@ -36,6 +37,7 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   const [error, setError] = useState<string | null>(null);
   const [creatingKey, setCreatingKey] = useState(false);
   const [revokingKeyId, setRevokingKeyId] = useState<number | null>(null);
+  const [showCreateKeyModal, setShowCreateKeyModal] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -75,6 +77,7 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
       });
       setCreatedKey(payload.apiKey);
       setName('');
+      setShowCreateKeyModal(false);
       await load();
       toast.success(locale === 'fa' ? 'کلید API ایجاد شد.' : 'API key created.');
     } catch (submitError) {
@@ -145,34 +148,16 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
           <CardDescription>{t(locale, 'apiKeys.create.description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void createKey(event)}>
-            <div className="space-y-1">
-              <FieldLabel label={t(locale, 'apiKeys.create.keyName')} hint={hints.keyName} />
-              <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t(locale, 'apiKeys.create.keyName')} required />
-            </div>
-            <div className="md:col-span-2 flex flex-wrap items-start gap-3 rounded-md border border-border p-3">
-              <FieldLabel
-                label={locale === 'fa' ? 'دسترسی‌ها' : 'Scopes'}
-                hint={hints.scopes}
-                className="w-full"
-              />
-              {AVAILABLE_SCOPES.map((scope) => (
-                <label key={scope} className="inline-flex items-center gap-1 text-xs">
-                  <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />
-                  {scope}
-                </label>
-              ))}
-            </div>
-            <div className="md:col-span-3">
-              <Button
-                type="submit"
-                loading={creatingKey}
-                loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
-              >
-                {t(locale, 'apiKeys.create.button')}
-              </Button>
-            </div>
-          </form>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
+            <p className="text-sm text-muted-foreground">
+              {locale === 'fa'
+                ? 'فرم ایجاد کلید API در پنجره جداگانه باز می‌شود.'
+                : 'Open the API key form in a modal and keep this page focused on key inventory.'}
+            </p>
+            <Button type="button" onClick={() => setShowCreateKeyModal(true)}>
+              {t(locale, 'apiKeys.create.button')}
+            </Button>
+          </div>
           {createdKey ? (
             <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
               <p className="font-medium">{t(locale, 'apiKeys.create.copyNow')}</p>
@@ -181,6 +166,43 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
           ) : null}
         </CardContent>
       </Card>
+      <Modal
+        open={showCreateKeyModal}
+        onClose={() => setShowCreateKeyModal(false)}
+        title={t(locale, 'apiKeys.create.title')}
+        description={t(locale, 'apiKeys.create.description')}
+        widthClassName="max-w-3xl"
+      >
+        <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void createKey(event)}>
+          <div className="space-y-1">
+            <FieldLabel label={t(locale, 'apiKeys.create.keyName')} hint={hints.keyName} />
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t(locale, 'apiKeys.create.keyName')}
+              required
+            />
+          </div>
+          <div className="md:col-span-2 flex flex-wrap items-start gap-3 rounded-md border border-border p-3">
+            <FieldLabel label={locale === 'fa' ? 'دسترسی‌ها' : 'Scopes'} hint={hints.scopes} className="w-full" />
+            {AVAILABLE_SCOPES.map((scope) => (
+              <label key={scope} className="inline-flex items-center gap-1 text-xs">
+                <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />
+                {scope}
+              </label>
+            ))}
+          </div>
+          <div className="md:col-span-3">
+            <Button
+              type="submit"
+              loading={creatingKey}
+              loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
+            >
+              {t(locale, 'apiKeys.create.button')}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Card>
         <CardHeader>

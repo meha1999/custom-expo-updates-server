@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { StatCard, StatLabel, StatValue } from '../../components/ui/stat';
 import { Table, Td, Th } from '../../components/ui/table';
@@ -47,6 +48,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [policyRollback, setPolicyRollback] = useState(false);
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
+  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -99,6 +101,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
         }),
       });
       setNewChannelName('');
+      setShowCreateChannelModal(false);
       setMessage(t(locale, 'channels.successCreate'));
       await loadData();
       toast.success(t(locale, 'channels.successCreate'));
@@ -188,20 +191,14 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form className="grid gap-2 sm:grid-cols-[1fr_auto]" onSubmit={(event) => void handleCreateChannel(event)}>
-                <div className="space-y-1">
-                  <FieldLabel label={t(locale, 'channels.create.placeholder')} hint={hints.createChannel} />
-                  <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder={t(locale, 'channels.create.placeholder')} required />
-                </div>
-                <Button
-                  type="submit"
-                  className="self-end"
-                  loading={creatingChannel}
-                  loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
-                >
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
+                <p className="text-sm text-muted-foreground">
+                  Open the create form in a modal to add a new channel.
+                </p>
+                <Button type="button" onClick={() => setShowCreateChannelModal(true)}>
                   {t(locale, 'channels.create.button')}
                 </Button>
-              </form>
+              </div>
               <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
                 <p className="text-xs font-medium">
                   {locale === 'fa' ? 'کانال‌های فعلی اپ فعال' : 'Current channels for active app'}
@@ -272,6 +269,28 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
             </CardContent>
           </Card>
         </section>
+      ) : null}
+
+      {userRole === 'admin' ? (
+        <Modal
+          open={showCreateChannelModal}
+          onClose={() => setShowCreateChannelModal(false)}
+          title={t(locale, 'channels.create.title')}
+          description="Create a dedicated release stream channel."
+          widthClassName="max-w-xl"
+        >
+          <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={(event) => void handleCreateChannel(event)}>
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'channels.create.placeholder')} hint={hints.createChannel} />
+              <Input value={newChannelName} onChange={(event) => setNewChannelName(event.target.value)} placeholder={t(locale, 'channels.create.placeholder')} required />
+            </div>
+            <div className="self-end">
+              <Button type="submit" loading={creatingChannel} loadingText="Creating...">
+                {t(locale, 'channels.create.button')}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-2">

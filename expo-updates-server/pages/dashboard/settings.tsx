@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { FieldLabel } from '../../components/ui/field-label';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
 import { useToast } from '../../components/providers/toast-provider';
@@ -58,6 +59,8 @@ function SettingsContent({
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
   const [creatingApp, setCreatingApp] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [showCreateAppModal, setShowCreateAppModal] = useState(false);
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const hints =
     locale === 'fa'
       ? {
@@ -118,6 +121,7 @@ function SettingsContent({
         `/api/admin/channels?app=${encodeURIComponent(created.slug)}`,
       );
       setChannels(createdChannels.channels);
+      setShowCreateAppModal(false);
       toast.success(locale === 'fa' ? 'اپ جدید با موفقیت ایجاد شد.' : 'App created successfully.');
     } catch (submitError) {
       const message =
@@ -140,6 +144,7 @@ function SettingsContent({
       setUsername('');
       setPassword('');
       await load();
+      setShowCreateUserModal(false);
       toast.success(locale === 'fa' ? 'کاربر جدید ایجاد شد.' : 'User created successfully.');
     } catch (submitError) {
       const message =
@@ -183,28 +188,12 @@ function SettingsContent({
         </CardHeader>
         <CardContent className="space-y-3">
           {userRole === 'admin' ? (
-            <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void handleCreateApp(event)}>
-              <div className="space-y-1">
-                <FieldLabel label={t(locale, 'settings.apps.appName')} hint={hints.appName} />
-                <Input value={appName} onChange={(event) => setAppName(event.target.value)} placeholder={t(locale, 'settings.apps.appName')} required />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label={t(locale, 'settings.apps.appSlug')} hint={hints.appSlug} />
-                <Input
-                  value={appSlugInput}
-                  onChange={(event) => setAppSlugInput(event.target.value)}
-                  placeholder={t(locale, 'settings.apps.appSlug')}
-                />
-              </div>
-              <Button
-                type="submit"
-                className="self-end"
-                loading={creatingApp}
-                loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
-              >
+            <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">The app creation form opens in a modal.</p>
+              <Button type="button" onClick={() => setShowCreateAppModal(true)}>
                 {t(locale, 'settings.apps.create')}
               </Button>
-            </form>
+            </div>
           ) : null}
           {createdApp && manifestUrl ? (
             <div className="space-y-2 rounded-md border border-success/30 bg-success/10 p-3">
@@ -312,31 +301,12 @@ function SettingsContent({
         </CardHeader>
         <CardContent className="space-y-3">
           {userRole === 'admin' ? (
-            <form className="grid gap-3 md:grid-cols-4" onSubmit={(event) => void handleCreateUser(event)}>
-              <div className="space-y-1">
-                <FieldLabel label={t(locale, 'settings.users.username')} hint={hints.username} />
-                <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t(locale, 'settings.users.username')} required />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label={t(locale, 'settings.users.password')} hint={hints.password} />
-                <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t(locale, 'settings.users.password')} required />
-              </div>
-              <div className="space-y-1">
-                <FieldLabel label={t(locale, 'settings.users.role')} hint={hints.role} />
-                <Select value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'viewer')}>
-                  <option value="viewer">{t(locale, 'settings.users.roleViewer')}</option>
-                  <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
-                </Select>
-              </div>
-              <Button
-                type="submit"
-                className="self-end"
-                loading={creatingUser}
-                loadingText={locale === 'fa' ? 'در حال ایجاد...' : 'Creating...'}
-              >
+            <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-sm text-muted-foreground">The user creation form opens in a modal.</p>
+              <Button type="button" onClick={() => setShowCreateUserModal(true)}>
                 {t(locale, 'settings.users.create')}
               </Button>
-            </form>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t(locale, 'settings.users.viewerReadOnly')}</p>
           )}
@@ -362,6 +332,77 @@ function SettingsContent({
           </div>
         </CardContent>
       </Card>
+
+      {userRole === 'admin' ? (
+        <Modal
+          open={showCreateAppModal}
+          onClose={() => setShowCreateAppModal(false)}
+          title={t(locale, 'settings.apps.create')}
+          description={t(locale, 'settings.apps.description')}
+          widthClassName="max-w-3xl"
+        >
+          <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void handleCreateApp(event)}>
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'settings.apps.appName')} hint={hints.appName} />
+              <Input value={appName} onChange={(event) => setAppName(event.target.value)} placeholder={t(locale, 'settings.apps.appName')} required />
+            </div>
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'settings.apps.appSlug')} hint={hints.appSlug} />
+              <Input
+                value={appSlugInput}
+                onChange={(event) => setAppSlugInput(event.target.value)}
+                placeholder={t(locale, 'settings.apps.appSlug')}
+              />
+            </div>
+            <div className="self-end">
+              <Button
+                type="submit"
+                loading={creatingApp}
+                loadingText="Creating..."
+              >
+                {t(locale, 'settings.apps.create')}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {userRole === 'admin' ? (
+        <Modal
+          open={showCreateUserModal}
+          onClose={() => setShowCreateUserModal(false)}
+          title={t(locale, 'settings.users.create')}
+          description={t(locale, 'settings.users.description')}
+          widthClassName="max-w-3xl"
+        >
+          <form className="grid gap-3 md:grid-cols-4" onSubmit={(event) => void handleCreateUser(event)}>
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'settings.users.username')} hint={hints.username} />
+              <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t(locale, 'settings.users.username')} required />
+            </div>
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'settings.users.password')} hint={hints.password} />
+              <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t(locale, 'settings.users.password')} required />
+            </div>
+            <div className="space-y-1">
+              <FieldLabel label={t(locale, 'settings.users.role')} hint={hints.role} />
+              <Select value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'viewer')}>
+                <option value="viewer">{t(locale, 'settings.users.roleViewer')}</option>
+                <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
+              </Select>
+            </div>
+            <div className="self-end">
+              <Button
+                type="submit"
+                loading={creatingUser}
+                loadingText="Creating..."
+              >
+                {t(locale, 'settings.users.create')}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 }
