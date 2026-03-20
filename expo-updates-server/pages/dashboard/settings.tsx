@@ -184,19 +184,18 @@ function SettingsContent({
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t(locale, 'settings.apps.title')}</CardTitle>
-          <CardDescription>{t(locale, 'settings.apps.description')}</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle>{t(locale, 'settings.apps.title')}</CardTitle>
+            <CardDescription>{t(locale, 'settings.apps.description')}</CardDescription>
+          </div>
+          {userRole === 'admin' ? (
+            <Button type="button" onClick={() => setShowCreateAppModal(true)}>
+              {t(locale, 'settings.apps.create')}
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-3">
-          {userRole === 'admin' ? (
-            <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
-              <p className="text-sm text-muted-foreground">The app creation form opens in a modal.</p>
-              <Button type="button" onClick={() => setShowCreateAppModal(true)}>
-                {t(locale, 'settings.apps.create')}
-              </Button>
-            </div>
-          ) : null}
           {createdApp && manifestUrl ? (
             <div className="space-y-2 rounded-md border border-success/30 bg-success/10 p-3">
               <p className="text-sm font-medium text-success">
@@ -319,21 +318,18 @@ function SettingsContent({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t(locale, 'settings.users.title')}</CardTitle>
-          <CardDescription>{t(locale, 'settings.users.description')}</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle>{t(locale, 'settings.users.title')}</CardTitle>
+            <CardDescription>{t(locale, 'settings.users.description')}</CardDescription>
+          </div>
+          {userRole === 'admin' ? (
+            <Button type="button" onClick={() => setShowCreateUserModal(true)}>
+              {t(locale, 'settings.users.create')}
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-3">
-          {userRole === 'admin' ? (
-            <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
-              <p className="text-sm text-muted-foreground">The user creation form opens in a modal.</p>
-              <Button type="button" onClick={() => setShowCreateUserModal(true)}>
-                {t(locale, 'settings.users.create')}
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">{t(locale, 'settings.users.viewerReadOnly')}</p>
-          )}
           <div className="overflow-auto">
             <Table>
               <thead>

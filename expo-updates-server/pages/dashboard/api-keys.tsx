@@ -143,30 +143,6 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   return (
     <div className="space-y-4">
       {error ? <p className="text-sm text-danger">{error}</p> : null}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t(locale, 'apiKeys.create.title')}</CardTitle>
-          <CardDescription>{t(locale, 'apiKeys.create.description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
-            <p className="text-sm text-muted-foreground">
-              {locale === 'fa'
-                ? 'فرم ایجاد کلید API در پنجره جداگانه باز می‌شود.'
-                : 'Open the API key form in a modal and keep this page focused on key inventory.'}
-            </p>
-            <Button type="button" onClick={() => setShowCreateKeyModal(true)}>
-              {t(locale, 'apiKeys.create.button')}
-            </Button>
-          </div>
-          {createdKey ? (
-            <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
-              <p className="font-medium">{t(locale, 'apiKeys.create.copyNow')}</p>
-              <p className="mt-1 break-all">{createdKey}</p>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
       <Modal
         open={showCreateKeyModal}
         onClose={() => setShowCreateKeyModal(false)}
@@ -206,10 +182,22 @@ function ApiKeysContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
       </Modal>
 
       <Card>
-        <CardHeader>
-          <CardTitle>{t(locale, 'apiKeys.list.title')}</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle>{t(locale, 'apiKeys.list.title')}</CardTitle>
+            <CardDescription>{t(locale, 'apiKeys.create.description')}</CardDescription>
+          </div>
+          <Button type="button" onClick={() => setShowCreateKeyModal(true)}>
+            {t(locale, 'apiKeys.create.button')}
+          </Button>
         </CardHeader>
-        <CardContent className="overflow-auto">
+        <CardContent className="space-y-3 overflow-auto">
+          {createdKey ? (
+            <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+              <p className="font-medium">{t(locale, 'apiKeys.create.copyNow')}</p>
+              <p className="mt-1 break-all">{createdKey}</p>
+            </div>
+          ) : null}
           <Table>
             <thead>
               <tr>

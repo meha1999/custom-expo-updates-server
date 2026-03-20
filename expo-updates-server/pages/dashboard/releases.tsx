@@ -357,38 +357,6 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
       {userRole === 'admin' ? (
         <section className="grid items-start gap-4 xl:grid-cols-12">
-          <Card className="xl:col-span-7">
-            <CardHeader>
-              <CardTitle>{t(locale, 'releases.register.title')}</CardTitle>
-              <CardDescription>{t(locale, 'releases.register.description')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 p-3">
-                <p className="text-sm text-muted-foreground">
-                  {locale === 'fa'
-                    ? 'فرم ثبت نسخه در پنجره جداگانه باز می‌شود.'
-                    : 'Open release registration in a modal and keep this page focused on operations.'}
-                </p>
-                <Button type="button" onClick={() => setShowRegisterReleaseModal(true)}>
-                  {t(locale, 'releases.register.button')}
-                </Button>
-              </div>
-              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                <div className="rounded-md border border-border bg-muted/20 p-2">
-                  <p className="font-medium">{t(locale, 'releases.register.runtimeVersion')}</p>
-                  <p>{runtimeVersion || '-'}</p>
-                </div>
-                <div className="rounded-md border border-border bg-muted/20 p-2">
-                  <p className="font-medium">{t(locale, 'releases.register.channel')}</p>
-                  <p>{channelName || '-'}</p>
-                </div>
-                <div className="rounded-md border border-border bg-muted/20 p-2">
-                  <p className="font-medium">{t(locale, 'releases.register.rollout')}</p>
-                  <p>{rolloutPercentage}%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
           <Modal
             open={showRegisterReleaseModal}
             onClose={() => setShowRegisterReleaseModal(false)}
@@ -467,7 +435,7 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
             </form>
           </Modal>
 
-          <Card className="xl:col-span-5">
+          <Card className="xl:col-span-12">
             <CardHeader>
               <CardTitle>{t(locale, 'releases.ops.title')}</CardTitle>
             </CardHeader>
@@ -673,8 +641,16 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
       <section className="grid gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>{t(locale, 'releases.recent.title')}</CardTitle>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div>
+              <CardTitle>{t(locale, 'releases.recent.title')}</CardTitle>
+              <CardDescription>{t(locale, 'releases.register.description')}</CardDescription>
+            </div>
+            {userRole === 'admin' ? (
+              <Button type="button" onClick={() => setShowRegisterReleaseModal(true)}>
+                {t(locale, 'releases.register.button')}
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent className="overflow-auto">
             <Table>

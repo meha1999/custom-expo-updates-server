@@ -202,40 +202,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
       {userRole === 'admin' ? (
         <section className="grid items-start gap-4 xl:grid-cols-12">
-          <Card className="xl:col-span-4">
-            <CardHeader>
-              <CardTitle>{t(locale, 'channels.create.title')}</CardTitle>
-              <CardDescription>
-                {locale === 'fa'
-                  ? 'کانال‌ها مسیرهای انتشار جداگانه هستند. برای مثال development برای تست داخلی و production برای کاربران نهایی.'
-                  : 'Channels represent isolated release streams. Example: development for internal testing and production for public users.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
-                <p className="text-sm text-muted-foreground">
-                  Open the create form in a modal to add a new channel.
-                </p>
-                <Button type="button" onClick={() => setShowCreateChannelModal(true)}>
-                  {t(locale, 'channels.create.button')}
-                </Button>
-              </div>
-              <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
-                <p className="text-xs font-medium">
-                  {locale === 'fa' ? 'کانال‌های فعلی اپ فعال' : 'Current channels for active app'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {channelOptions.map((channel) => (
-                    <Badge key={`existing-${channel}`} variant="muted">
-                      {channel}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="xl:col-span-8">
+          <Card className="xl:col-span-12">
             <CardHeader>
               <CardTitle>{t(locale, 'channels.policy.title')}</CardTitle>
               <CardDescription>{t(locale, 'channels.policy.description')}</CardDescription>
@@ -316,8 +283,20 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
       <section className="grid gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>{t(locale, 'channels.list.channelsTitle')}</CardTitle>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div>
+              <CardTitle>{t(locale, 'channels.list.channelsTitle')}</CardTitle>
+              <CardDescription>
+                {locale === 'fa'
+                  ? 'لیست کانال‌ها و آدرس مانيفست هر کانال.'
+                  : 'Channel list with per-channel manifest URL.'}
+              </CardDescription>
+            </div>
+            {userRole === 'admin' ? (
+              <Button type="button" onClick={() => setShowCreateChannelModal(true)}>
+                {t(locale, 'channels.create.button')}
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent className="overflow-auto">
             <Table>
