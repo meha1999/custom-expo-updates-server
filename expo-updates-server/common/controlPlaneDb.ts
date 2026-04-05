@@ -29,6 +29,8 @@ export interface AppRecord {
   slug: string;
   name: string;
   createdAt: string;
+  codeSigningKeyId: string;
+  hasCodeSigningPrivateKey: boolean;
 }
 
 export interface ChannelRecord {
@@ -276,6 +278,8 @@ function runMigrations(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       slug TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
+      code_signing_private_key TEXT,
+      code_signing_key_id TEXT NOT NULL DEFAULT 'main',
       created_at TEXT NOT NULL
     );
 
@@ -384,6 +388,19 @@ function runMigrations(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_acks_timestamp ON update_acks(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_admin_audit_timestamp ON admin_audit_logs(timestamp DESC);
   `);
+
+  ensureAppSigningColumns(db);
+}
+
+function ensureAppSigningColumns(db: Database.Database): void {
+  const columns = db.prepare(`PRAGMA table_info(apps)`).all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+  if (!columnNames.has('code_signing_private_key')) {
+    db.exec(`ALTER TABLE apps ADD COLUMN code_signing_private_key TEXT`);
+  }
+  if (!columnNames.has('code_signing_key_id')) {
+    db.exec(`ALTER TABLE apps ADD COLUMN code_signing_key_id TEXT NOT NULL DEFAULT 'main'`);
+  }
 }
 
 function seedDefaults(db: Database.Database): void {
@@ -461,11 +478,20 @@ function createApiKeyMaterial(): { plain: string; hash: string; prefix: string }
 }
 
 function toAppRecord(row: any): AppRecord {
+  const storedKeyId = typeof row.code_signing_key_id === 'string' ? row.code_signing_key_id.trim() : '';
+  const rawPrivateKey =
+    typeof row.code_signing_private_key === 'string' ? row.code_signing_private_key.trim() : '';
+  const hasCodeSigningPrivateKey =
+    typeof row.has_code_signing_private_key === 'number'
+      ? row.has_code_signing_private_key === 1
+      : rawPrivateKey.length > 0;
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     createdAt: row.created_at,
+    codeSigningKeyId: storedKeyId || 'main',
+    hasCodeSigningPrivateKey,
   };
 }
 
@@ -784,7 +810,24 @@ export function validateApiKey(
 
 export function listApps(): AppRecord[] {
   const db = ensureInitialized();
-  const rows = db.prepare('SELECT id, slug, name, created_at FROM apps ORDER BY slug ASC').all() as any[];
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        id,
+        slug,
+        name,
+        created_at,
+        code_signing_key_id,
+        CASE
+          WHEN code_signing_private_key IS NOT NULL AND TRIM(code_signing_private_key) != '' THEN 1
+          ELSE 0
+        END AS has_code_signing_private_key
+      FROM apps
+      ORDER BY slug ASC
+      `,
+    )
+    .all() as any[];
   return rows.map(toAppRecord);
 }
 
@@ -801,8 +844,8 @@ export function createApp(name: string, slug?: string): AppRecord {
 
   const now = new Date().toISOString();
   const result = db
-    .prepare('INSERT INTO apps (slug, name, created_at) VALUES (?, ?, ?)')
-    .run(derivedSlug, normalizedName, now);
+    .prepare('INSERT INTO apps (slug, name, code_signing_key_id, created_at) VALUES (?, ?, ?, ?)')
+    .run(derivedSlug, normalizedName, 'main', now);
   const appId = Number(result.lastInsertRowid);
   ensureDefaultChannels(db, appId, now);
 
@@ -811,6 +854,8 @@ export function createApp(name: string, slug?: string): AppRecord {
     slug: derivedSlug,
     name: normalizedName,
     createdAt: now,
+    codeSigningKeyId: 'main',
+    hasCodeSigningPrivateKey: false,
   };
 }
 
@@ -818,12 +863,85 @@ export function getOrCreateAppBySlug(appSlug: string): AppRecord {
   const db = ensureInitialized();
   const normalizedSlug = sanitizeSlug(appSlug || 'default') || 'default';
   const existing = db
-    .prepare('SELECT id, slug, name, created_at FROM apps WHERE slug = ?')
+    .prepare(
+      `
+      SELECT
+        id,
+        slug,
+        name,
+        created_at,
+        code_signing_private_key,
+        code_signing_key_id,
+        CASE
+          WHEN code_signing_private_key IS NOT NULL AND TRIM(code_signing_private_key) != '' THEN 1
+          ELSE 0
+        END AS has_code_signing_private_key
+      FROM apps
+      WHERE slug = ?
+      `,
+    )
     .get(normalizedSlug) as any | undefined;
   if (existing) {
     return toAppRecord(existing);
   }
   return createApp(normalizedSlug, normalizedSlug);
+}
+
+export function updateAppCodeSigning(input: {
+  appSlug: string;
+  keyId?: string;
+  privateKeyPem?: string;
+  clearPrivateKey?: boolean;
+}): AppRecord {
+  const db = ensureInitialized();
+  const app = getOrCreateAppBySlug(input.appSlug);
+  const updates: string[] = [];
+  const params: Array<string | null | number> = [];
+
+  if (typeof input.keyId === 'string') {
+    const keyId = input.keyId.trim() || 'main';
+    updates.push('code_signing_key_id = ?');
+    params.push(keyId);
+  }
+
+  if (typeof input.privateKeyPem === 'string') {
+    const privateKeyPem = input.privateKeyPem.trim();
+    if (privateKeyPem.length > 0) {
+      updates.push('code_signing_private_key = ?');
+      params.push(privateKeyPem);
+    }
+  }
+
+  if (input.clearPrivateKey) {
+    updates.push('code_signing_private_key = NULL');
+  }
+
+  if (updates.length === 0) {
+    throw new Error('No code signing fields provided');
+  }
+
+  db.prepare(`UPDATE apps SET ${updates.join(', ')} WHERE id = ?`).run(...params, app.id);
+  return getOrCreateAppBySlug(app.slug);
+}
+
+export function getAppCodeSigningConfig(appSlug: string): {
+  keyId: string;
+  privateKeyPem: string | null;
+} {
+  const db = ensureInitialized();
+  const app = getOrCreateAppBySlug(appSlug);
+  const row = db
+    .prepare('SELECT code_signing_private_key, code_signing_key_id FROM apps WHERE id = ?')
+    .get(app.id) as
+    | {
+        code_signing_private_key: string | null;
+        code_signing_key_id: string | null;
+      }
+    | undefined;
+
+  const keyId = row?.code_signing_key_id?.trim() || 'main';
+  const privateKeyPem = row?.code_signing_private_key?.trim() || null;
+  return { keyId, privateKeyPem };
 }
 
 export function listChannels(appSlug: string): ChannelRecord[] {

@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
+import { Textarea } from '../../components/ui/textarea';
 import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { formatDate } from '../../lib/format';
@@ -56,10 +57,13 @@ function SettingsContent({
 
   const [appName, setAppName] = useState('');
   const [appSlugInput, setAppSlugInput] = useState('');
+  const [signingKeyId, setSigningKeyId] = useState('main');
+  const [signingPrivateKeyPem, setSigningPrivateKeyPem] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
   const [creatingApp, setCreatingApp] = useState(false);
+  const [savingSigning, setSavingSigning] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
   const [showCreateAppModal, setShowCreateAppModal] = useState(false);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -83,6 +87,12 @@ function SettingsContent({
   useEffect(() => {
     void load();
   }, [activeAppSlug, userRole, locale]);
+
+  useEffect(() => {
+    const activeApp = apps.find((app) => app.slug === activeAppSlug);
+    setSigningKeyId(activeApp?.codeSigningKeyId || 'main');
+    setSigningPrivateKeyPem('');
+  }, [apps, activeAppSlug]);
 
   async function load(): Promise<void> {
     try {
@@ -158,12 +168,66 @@ function SettingsContent({
     }
   }
 
+  async function handleSaveSigning(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    try {
+      setSavingSigning(true);
+      const payload: Record<string, unknown> = {
+        appSlug: activeAppSlug,
+        codeSigningKeyId: signingKeyId || 'main',
+      };
+      if (signingPrivateKeyPem.trim()) {
+        payload.codeSigningPrivateKeyPem = signingPrivateKeyPem;
+      }
+      await jsonFetch<AppItem>('/api/admin/apps', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      await load();
+      await refreshApps();
+      setSigningPrivateKeyPem('');
+      toast.success(locale === 'fa' ? 'تنظیمات امضای کد ذخیره شد.' : 'Code signing settings saved.');
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSavingSigning(false);
+    }
+  }
+
+  async function handleClearSigningKey(): Promise<void> {
+    try {
+      setSavingSigning(true);
+      await jsonFetch<AppItem>('/api/admin/apps', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          appSlug: activeAppSlug,
+          clearCodeSigningPrivateKey: true,
+        }),
+      });
+      await load();
+      await refreshApps();
+      setSigningPrivateKeyPem('');
+      toast.success(locale === 'fa' ? 'کلید خصوصی این اپ حذف شد.' : 'Private key removed for this app.');
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSavingSigning(false);
+    }
+  }
+
   function buildManifestUrl(targetAppSlug: string, channelName: string): string {
     const origin = typeof window === 'undefined' ? '' : window.location.origin;
     return `${origin}/api/manifest?app=${encodeURIComponent(targetAppSlug)}&channel=${encodeURIComponent(channelName)}`;
   }
 
   const manifestUrl = createdApp ? buildManifestUrl(createdApp.slug, 'production') : null;
+  const activeApp = apps.find((app) => app.slug === activeAppSlug);
 
   async function copyValue(value: string, key: string): Promise<void> {
     if (!value || typeof navigator === 'undefined') {
@@ -272,6 +336,61 @@ function SettingsContent({
                 : 'Use the matching channel URL in your app updates.url for each environment.'}
             </p>
           </div>
+          {userRole === 'admin' ? (
+            <div className="space-y-3 rounded-md border border-border/70 bg-muted/40 p-3">
+              <div>
+                <p className="text-sm font-medium">Code Signing (optional)</p>
+                <p className="text-xs text-muted-foreground">
+                  Store a PEM private key for the active app. If empty, signing only uses global PRIVATE_KEY_PATH.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <Badge variant={activeApp?.hasCodeSigningPrivateKey ? 'success' : 'muted'}>
+                  {activeApp?.hasCodeSigningPrivateKey ? 'App key configured' : 'No app key'}
+                </Badge>
+                <span className="text-muted-foreground">Active app: {activeAppSlug}</span>
+              </div>
+              <form className="space-y-3" onSubmit={(event) => void handleSaveSigning(event)}>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label="Key ID"
+                    hint="Must match updates.codeSigningMetadata.keyid in the client app."
+                  />
+                  <Input
+                    value={signingKeyId}
+                    onChange={(event) => setSigningKeyId(event.target.value)}
+                    placeholder="main"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <FieldLabel
+                    label="Private Key (PEM)"
+                    hint="Optional. Paste PEM here to add or rotate the app key."
+                  />
+                  <Textarea
+                    value={signingPrivateKeyPem}
+                    onChange={(event) => setSigningPrivateKeyPem(event.target.value)}
+                    placeholder="-----BEGIN PRIVATE KEY-----"
+                    className="min-h-32 font-mono text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="submit" loading={savingSigning} loadingText="Saving...">
+                    Save Signing Settings
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleClearSigningKey()}
+                    loading={savingSigning}
+                    loadingText="Clearing..."
+                  >
+                    Clear App Key
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : null}
           <div className="overflow-auto">
             <Table>
               <thead>
@@ -436,3 +555,4 @@ function SettingsContent({
     </div>
   );
 }
+

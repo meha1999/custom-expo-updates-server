@@ -11,6 +11,8 @@ export interface AppItem {
   slug: string;
   name: string;
   createdAt?: string;
+  codeSigningKeyId?: string;
+  hasCodeSigningPrivateKey?: boolean;
 }
 
 export interface ChannelItem {

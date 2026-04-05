@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { serializeDictionary } from 'structured-headers';
 
 import {
+  getAppCodeSigningConfig,
   insertRequestLog,
   resolveReleaseForRequest,
 } from '../../common/controlPlaneDb';
@@ -106,7 +107,13 @@ export default async function manifestEndpoint(req: NextApiRequest, res: NextApi
     });
 
     if (resolution.kind === 'rollback') {
-      await putRollBackDirectiveInResponseAsync(req, res, protocolVersion, resolution.policy.updatedAt);
+      await putRollBackDirectiveInResponseAsync(
+        req,
+        res,
+        protocolVersion,
+        resolution.policy.updatedAt,
+        context.appSlug,
+      );
       await logEvent('manifest_rollback', res.statusCode, {
         message: 'Rollback policy active',
       });
@@ -119,7 +126,7 @@ export default async function manifestEndpoint(req: NextApiRequest, res: NextApi
         await logEvent('manifest_error', 404, { message: resolution.reason });
         return;
       }
-      await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion);
+      await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion, context.appSlug);
       await logEvent('manifest_no_update', res.statusCode, {
         message: resolution.reason,
       });
@@ -128,7 +135,13 @@ export default async function manifestEndpoint(req: NextApiRequest, res: NextApi
 
     const release = resolution.release;
     if (release.isRollback) {
-      await putRollBackInResponseAsync(req, res, release.updatePath, protocolVersion);
+      await putRollBackInResponseAsync(
+        req,
+        res,
+        release.updatePath,
+        protocolVersion,
+        context.appSlug,
+      );
       await logEvent('manifest_rollback', res.statusCode, {
         bundlePath: release.updatePath,
       });
@@ -142,6 +155,7 @@ export default async function manifestEndpoint(req: NextApiRequest, res: NextApi
       runtimeVersion,
       platform,
       protocolVersion,
+      context.appSlug,
     );
 
     await logEvent('manifest_update', res.statusCode, {
@@ -151,7 +165,7 @@ export default async function manifestEndpoint(req: NextApiRequest, res: NextApi
   } catch (error) {
     if (error instanceof NoUpdateAvailableError) {
       try {
-        await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion);
+        await putNoUpdateAvailableInResponseAsync(req, res, protocolVersion, context.appSlug);
         await logEvent('manifest_no_update', res.statusCode, {
           message: 'Client already on latest update',
         });
@@ -185,6 +199,7 @@ async function putUpdateInResponseAsync(
   runtimeVersion: string,
   platform: string,
   protocolVersion: number,
+  appSlug: string,
 ): Promise<{ manifestId: string }> {
   const currentUpdateId = req.headers['expo-current-update-id'];
   const { metadataJson, createdAt, id } = await getMetadataAsync({
@@ -234,10 +249,11 @@ async function putUpdateInResponseAsync(
   let signature = null;
   const expectSignatureHeader = req.headers['expo-expect-signature'];
   if (expectSignatureHeader) {
-    const privateKey = await getPrivateKeyAsync();
+    const signingConfig = await getSigningConfigAsync(appSlug);
+    const privateKey = signingConfig.privateKey;
     if (!privateKey) {
       res.status(400).json({
-        error: 'Code signing requested but no key supplied when starting server.',
+        error: `Code signing requested but no key is configured for app "${appSlug}".`,
       });
       return { manifestId: manifest.id };
     }
@@ -245,7 +261,7 @@ async function putUpdateInResponseAsync(
     const hashSignature = signRSASHA256(manifestString, privateKey);
     const dictionary = convertToDictionaryItemsRepresentation({
       sig: hashSignature,
-      keyid: 'main',
+      keyid: signingConfig.keyId,
     });
     signature = serializeDictionary(dictionary);
   }
@@ -284,6 +300,7 @@ async function putRollBackInResponseAsync(
   res: NextApiResponse,
   updateBundlePath: string,
   protocolVersion: number,
+  appSlug: string,
 ): Promise<void> {
   if (protocolVersion === 0) {
     throw new Error('Rollbacks not supported on protocol version 0');
@@ -300,7 +317,7 @@ async function putRollBackInResponseAsync(
   }
 
   const directive = await createRollBackDirectiveAsync(updateBundlePath);
-  await sendDirectiveAsync(req, res, directive, 1);
+  await sendDirectiveAsync(req, res, directive, 1, appSlug);
 }
 
 async function putRollBackDirectiveInResponseAsync(
@@ -308,6 +325,7 @@ async function putRollBackDirectiveInResponseAsync(
   res: NextApiResponse,
   protocolVersion: number,
   commitTime: string,
+  appSlug: string,
 ): Promise<void> {
   if (protocolVersion === 0) {
     throw new Error('Rollbacks not supported on protocol version 0');
@@ -330,20 +348,21 @@ async function putRollBackDirectiveInResponseAsync(
     },
   };
 
-  await sendDirectiveAsync(req, res, directive, 1);
+  await sendDirectiveAsync(req, res, directive, 1, appSlug);
 }
 
 async function putNoUpdateAvailableInResponseAsync(
   req: NextApiRequest,
   res: NextApiResponse,
   protocolVersion: number,
+  appSlug: string,
 ): Promise<void> {
   if (protocolVersion === 0) {
     throw new Error('NoUpdateAvailable directive not available in protocol version 0');
   }
 
   const directive = await createNoUpdateAvailableDirectiveAsync();
-  await sendDirectiveAsync(req, res, directive, 1);
+  await sendDirectiveAsync(req, res, directive, 1, appSlug);
 }
 
 async function sendDirectiveAsync(
@@ -351,15 +370,17 @@ async function sendDirectiveAsync(
   res: NextApiResponse,
   directive: object,
   protocolVersion: number,
+  appSlug: string,
 ): Promise<void> {
   let signature = null;
   const expectSignatureHeader = req.headers['expo-expect-signature'];
   if (expectSignatureHeader) {
-    const privateKey = await getPrivateKeyAsync();
+    const signingConfig = await getSigningConfigAsync(appSlug);
+    const privateKey = signingConfig.privateKey;
     if (!privateKey) {
       res.statusCode = 400;
       res.json({
-        error: 'Code signing requested but no key supplied when starting server.',
+        error: `Code signing requested but no key is configured for app "${appSlug}".`,
       });
       return;
     }
@@ -367,7 +388,7 @@ async function sendDirectiveAsync(
     const hashSignature = signRSASHA256(directiveString, privateKey);
     const dictionary = convertToDictionaryItemsRepresentation({
       sig: hashSignature,
-      keyid: 'main',
+      keyid: signingConfig.keyId,
     });
     signature = serializeDictionary(dictionary);
   }
@@ -388,4 +409,20 @@ async function sendDirectiveAsync(
   res.setHeader('content-type', `multipart/mixed; boundary=${form.getBoundary()}`);
   res.write(form.getBuffer());
   res.end();
+}
+
+async function getSigningConfigAsync(appSlug: string): Promise<{ privateKey: string | null; keyId: string }> {
+  const appConfig = getAppCodeSigningConfig(appSlug);
+  if (appConfig.privateKeyPem) {
+    return {
+      privateKey: appConfig.privateKeyPem,
+      keyId: appConfig.keyId || 'main',
+    };
+  }
+
+  const fallbackKey = await getPrivateKeyAsync();
+  return {
+    privateKey: fallbackKey,
+    keyId: appConfig.keyId || 'main',
+  };
 }
