@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "PRIVATE_KEY_PATH=code-signing-keys/private-key.pem next dev --turbopack",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "PRIVATE_KEY_PATH=code-signing-keys/private-key.pem next start",
     "lint": "eslint common pages",
@@ -16,7 +16,7 @@
     "better-sqlite3": "^11.8.1",
     "form-data": "^4.0.4",
     "mime": "^2.5.2",
-    "next": "15.5.3",
+    "next": "15.5.9",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "structured-headers": "^0.4.1"

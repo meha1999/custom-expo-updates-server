@@ -74,7 +74,58 @@ export function requireAuth(
     res.status(403).json({ error: 'Forbidden' });
     return null;
   }
+  if (isMutationMethod(req.method) && !isTrustedOrigin(req)) {
+    res.status(403).json({ error: 'Invalid origin' });
+    return null;
+  }
   return user;
+}
+
+function isMutationMethod(method: string | undefined): boolean {
+  return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+}
+
+function isTrustedOrigin(req: NextApiRequest): boolean {
+  const origin = getHeader(req.headers.origin);
+  const referer = getHeader(req.headers.referer);
+  if (!origin && !referer) {
+    // Non-browser clients (CLI, server-to-server) usually do not send origin/referer.
+    return true;
+  }
+
+  const requestHost = getHeader(req.headers['x-forwarded-host']) ?? getHeader(req.headers.host);
+  if (!requestHost) {
+    return false;
+  }
+  const forwardedProto = getHeader(req.headers['x-forwarded-proto']);
+  const protocol = forwardedProto || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const expectedOrigin = `${protocol}://${requestHost}`.toLowerCase();
+  const configuredOrigin = process.env.HOSTNAME?.trim().replace(/\/+$/, '').toLowerCase();
+
+  const allowedOrigins = new Set([expectedOrigin, ...(configuredOrigin ? [configuredOrigin] : [])]);
+  const candidate = (origin || extractOriginFromReferer(referer) || '').toLowerCase();
+  return candidate !== '' && allowedOrigins.has(candidate);
+}
+
+function extractOriginFromReferer(referer: string | undefined): string | undefined {
+  if (!referer) {
+    return undefined;
+  }
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function getHeader(value: string | string[] | undefined): string | undefined {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    return value[0]?.trim();
+  }
+  return undefined;
 }
 
 export function readBearerToken(req: NextApiRequest): string | undefined {

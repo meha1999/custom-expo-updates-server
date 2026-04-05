@@ -134,3 +134,39 @@ export interface DashboardPayload {
     detailsJson: string;
   }>;
 }
+
+export interface SecurityPayload {
+  auth: {
+    passwordHashing: string;
+    sessionTtlDays: number;
+    cookieHttpOnly: boolean;
+    cookieSameSite: string;
+    cookieSecureInProduction: boolean;
+    csrfOriginProtection: boolean;
+    bruteForceProtection: {
+      maxAttempts: number;
+      windowMinutes: number;
+      lockMinutes: number;
+    };
+    productionAdminOnlyLogin: boolean;
+    productionViewerCreationDisabled: boolean;
+  };
+  deployment: {
+    nodeEnv: string;
+    hostname: string | null;
+    httpsConfigured: boolean;
+    bootAdminPasswordConfigured: boolean;
+    bootAdminPasswordIsDefault: boolean;
+  };
+  users: {
+    total: number;
+    admins: number;
+    viewers: number;
+  };
+  storage: {
+    engine: string;
+    path: string;
+  };
+  generatedAt: string;
+  production: boolean;
+}

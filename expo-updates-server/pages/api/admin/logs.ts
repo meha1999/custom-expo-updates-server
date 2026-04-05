@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '../../../common/auth';
 import { exportRequestLogsCsv, listRequestLogs } from '../../../common/controlPlaneDb';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 function getQueryValue(value: string | string[] | undefined): string | undefined {
   if (typeof value === 'string') {
@@ -23,7 +24,6 @@ export default function logsEndpoint(req: NextApiRequest, res: NextApiResponse) 
     return;
   }
 
-  const appSlug = getQueryValue(req.query.app) ?? 'default';
   const channelName = getQueryValue(req.query.channelName);
   const eventType = getQueryValue(req.query.eventType);
   const status = getQueryValue(req.query.status);
@@ -34,7 +34,7 @@ export default function logsEndpoint(req: NextApiRequest, res: NextApiResponse) 
 
   if (format === 'csv') {
     const csv = exportRequestLogsCsv({
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       channelName,
       eventType,
       status: status ? Number(status) : undefined,
@@ -48,7 +48,7 @@ export default function logsEndpoint(req: NextApiRequest, res: NextApiResponse) 
   }
 
   const result = listRequestLogs({
-    appSlug,
+    appSlug: SINGLE_APP_SLUG,
     channelName,
     eventType,
     status: status ? Number(status) : undefined,
@@ -58,4 +58,3 @@ export default function logsEndpoint(req: NextApiRequest, res: NextApiResponse) 
   });
   res.status(200).json(result);
 }
-

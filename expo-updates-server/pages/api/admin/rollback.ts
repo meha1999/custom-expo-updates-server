@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '../../../common/auth';
 import { insertAdminAuditLog, rollbackChannel } from '../../../common/controlPlaneDb';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 export default function rollbackEndpoint(req: NextApiRequest, res: NextApiResponse) {
   const admin = requireAuth(req, res, { role: 'admin' });
@@ -13,7 +14,6 @@ export default function rollbackEndpoint(req: NextApiRequest, res: NextApiRespon
     return;
   }
 
-  const appSlug = `${req.body?.appSlug ?? 'default'}`.trim();
   const channelName = `${req.body?.channelName ?? ''}`.trim();
   const runtimeVersion = `${req.body?.runtimeVersion ?? ''}`.trim();
   if (!channelName || !runtimeVersion) {
@@ -23,14 +23,14 @@ export default function rollbackEndpoint(req: NextApiRequest, res: NextApiRespon
 
   try {
     const policy = rollbackChannel({
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       channelName,
       runtimeVersion,
     });
     insertAdminAuditLog({
       actorUsername: admin.username,
       action: 'release.rollback',
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       details: {
         channelName,
         runtimeVersion,

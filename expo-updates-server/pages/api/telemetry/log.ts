@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { readApiKeyFromRequest } from '../../../common/auth';
 import { DashboardLogEvent, insertRequestLog, validateApiKey } from '../../../common/controlPlaneDb';
 import { getRequestContext } from '../../../common/requestContext';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 export default function telemetryLogEndpoint(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -40,7 +41,7 @@ export default function telemetryLogEndpoint(req: NextApiRequest, res: NextApiRe
     requestPath: `${req.body?.requestPath ?? '/external'}`,
     method: `${req.body?.method ?? 'POST'}`,
     status,
-    appSlug: `${req.body?.appSlug ?? context.appSlug}`.trim() || 'default',
+    appSlug: SINGLE_APP_SLUG,
     channelName: `${req.body?.channelName ?? context.channelName}`.trim() || undefined,
     platform: `${req.body?.platform ?? context.platform ?? ''}`.trim() || undefined,
     runtimeVersion: `${req.body?.runtimeVersion ?? context.runtimeVersion ?? ''}`.trim() || undefined,

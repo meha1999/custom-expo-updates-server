@@ -11,8 +11,6 @@ interface DashboardPageProps {
   children: (context: {
     appSlug: string;
     userRole: 'admin' | 'viewer';
-    setApp: (slug: string) => Promise<void>;
-    refreshApps: () => Promise<void>;
   }) => ReactNode;
 }
 
@@ -34,16 +32,11 @@ export function DashboardPage({ title, subtitle, children }: DashboardPageProps)
       user={auth.user}
       title={title}
       subtitle={subtitle}
-      appSlug={appScope.appSlug}
-      apps={appScope.apps}
-      onChangeApp={appScope.setApp}
       onLogout={auth.logout}
     >
       {children({
         appSlug: appScope.appSlug,
         userRole: auth.user.role,
-        setApp: appScope.setApp,
-        refreshApps: appScope.refreshApps,
       })}
     </DashboardShell>
   );

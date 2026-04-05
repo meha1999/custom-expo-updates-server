@@ -17,12 +17,12 @@ export default function DashboardOverviewPage() {
       title={t(locale, 'overview.title')}
       subtitle={t(locale, 'overview.subtitle')}
     >
-      {({ appSlug }) => <OverviewContent appSlug={appSlug} />}
+      {() => <OverviewContent />}
     </DashboardPage>
   );
 }
 
-function OverviewContent({ appSlug }: { appSlug: string }) {
+function OverviewContent() {
   const { locale } = useLocale();
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
     async function load() {
       try {
         const payload = await jsonFetch<DashboardPayload>(
-          `/api/dashboard?app=${encodeURIComponent(appSlug)}&limit=120`,
+          '/api/dashboard?limit=120',
         );
         if (!active) return;
         setData(payload);
@@ -53,7 +53,7 @@ function OverviewContent({ appSlug }: { appSlug: string }) {
       active = false;
       window.clearInterval(timer);
     };
-  }, [appSlug, locale]);
+  }, [locale]);
 
   const totalPlatforms =
     (data?.platformBreakdown.ios ?? 0) +

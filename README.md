@@ -20,11 +20,11 @@ In some cases more control of how updates are sent to an app may be needed, and 
    - `cd ../expo-updates-client && yarn`
 2. Configure server environment in `expo-updates-server/.env.local`:
    - Set `HOSTNAME=http://localhost:3000`
-   - Optionally set:
+   - Set admin credentials (required for first boot):
       cat > .env.local <<'EOF'
    HOSTNAME=HOST_NAME:3000
    DASHBOARD_ADMIN_USERNAME=admin
-   DASHBOARD_ADMIN_PASSWORD=change123456@Qaz
+   DASHBOARD_ADMIN_PASSWORD=your-strong-admin-password
    # PRIVATE_KEY_PATH=./code-signing-keys/private-key.pem
    EOF
 3. Start the updates server + dashboard:
@@ -32,9 +32,9 @@ In some cases more control of how updates are sent to an app may be needed, and 
    - `yarn dev`
 4. Open dashboard and sign in:
    - URL: `http://localhost:3000`
-   - Default login:
+   - Login:
      - Username: `admin`
-     - Password: `change-me-now`
+     - Password: value from `DASHBOARD_ADMIN_PASSWORD`
 5. (Recommended) Create ingestion API keys in dashboard:
    - Go to API Keys section
    - Create `telemetry:write` key for `/api/telemetry/ack`
@@ -45,6 +45,10 @@ In some cases more control of how updates are sent to an app may be needed, and 
 7. Publish an update bundle:
    - `cd ../expo-updates-server`
    - `yarn expo-publish`
+   - Or with the installable Linux CLI:
+     - `npm install -g ./expo-updates-cli`
+     - `custom-expo-update login --server http://localhost:3000 --username admin --password '<your-admin-password>'`
+     - `cd ../expo-updates-client && custom-expo-update publish:auto --channel production`
 8. Test OTA flow:
    - Force close and reopen the release app
    - App requests `/api/manifest` and `/api/assets`
@@ -55,6 +59,23 @@ In some cases more control of how updates are sent to an app may be needed, and 
    - Promote between channels
    - Roll back to embedded
    - Filter logs and export CSV
+
+### Linux publishing CLI (EAS-style flow)
+
+An installable CLI is available in `expo-updates-cli` for publishing OTA bundles with one command.
+
+1. Export the client update:
+   - `cd expo-updates-client`
+   - `npx expo export --output-dir dist`
+2. Install the CLI:
+   - `npm install -g ./expo-updates-cli`
+3. One-time login:
+   - `custom-expo-update login --server http://localhost:3000 --username admin --password '<your-admin-password>'`
+4. Publish automatically:
+   - `cd expo-updates-client && custom-expo-update publish:auto --channel production`
+
+You can also set these env vars instead of flags:
+`EXPO_UPDATES_SERVER_URL`, `EXPO_UPDATES_USERNAME`, `EXPO_UPDATES_PASSWORD`, `EXPO_UPDATES_RUNTIME_VERSION`, `EXPO_UPDATES_BUNDLE_ID`, `EXPO_UPDATES_EXPORT_DIR`, `EXPO_UPDATES_CHANNEL`.
 
 ### Updates overview
 
@@ -148,12 +169,9 @@ This fork now includes:
 9. SQLite storage (`expo-updates-server/data/control-plane.sqlite`) replacing JSON event storage.
    - Includes `users`, `sessions`, `apps`, `channels`, `releases`, `channel_runtime_policies`, `devices`, `request_logs`, `update_acks`, and `admin_audit_logs`.
 
-## Default credentials
+## Admin credentials
 
-- Username: `admin`
-- Password: `change-me-now`
-
-Override via environment variables:
+Set via environment variables before first boot:
 
 - `DASHBOARD_ADMIN_USERNAME`
 - `DASHBOARD_ADMIN_PASSWORD`

@@ -1,0 +1,17 @@
+{
+  "name": "@custom/expo-updates-cli",
+  "version": "0.1.0",
+  "description": "CLI to publish OTA bundles to a custom Expo updates server",
+  "bin": {
+    "custom-expo-update": "./bin/custom-expo-update.js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "license": "MIT"
+}

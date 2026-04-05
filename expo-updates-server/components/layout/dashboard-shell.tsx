@@ -4,7 +4,7 @@ import { ReactNode, useMemo, useState } from 'react';
 import { useLocale } from '../../hooks/use-locale';
 import { t } from '../../lib/i18n';
 import type { Locale } from '../../lib/i18n';
-import { AppItem, AuthUser } from '../../lib/types';
+import { AuthUser } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { useToast } from '../providers/toast-provider';
 import { Button } from '../ui/button';
@@ -15,9 +15,6 @@ interface DashboardShellProps {
   user: AuthUser;
   title: string;
   subtitle?: string;
-  appSlug: string;
-  apps: AppItem[];
-  onChangeApp: (slug: string) => Promise<void>;
   onLogout: () => Promise<void>;
   children: ReactNode;
 }
@@ -30,6 +27,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { labelKey: 'shell.nav.overview', href: '/dashboard' },
+  { labelKey: 'shell.nav.security', href: '/dashboard/security', adminOnly: true },
   { labelKey: 'shell.nav.releases', href: '/dashboard/releases' },
   { labelKey: 'shell.nav.channels', href: '/dashboard/channels' },
   { labelKey: 'shell.nav.devices', href: '/dashboard/devices' },
@@ -38,32 +36,18 @@ const navItems: NavItem[] = [
   { labelKey: 'shell.nav.settings', href: '/dashboard/settings' },
 ];
 
-export function DashboardShell({
-  user,
-  title,
-  subtitle,
-  appSlug,
-  apps,
-  onChangeApp,
-  onLogout,
-  children,
-}: DashboardShellProps) {
+export function DashboardShell({ user, title, subtitle, onLogout, children }: DashboardShellProps) {
   const router = useRouter();
   const { locale, isRtl, setLocale } = useLocale();
   const toast = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [changingApp, setChangingApp] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const hints =
     locale === 'fa'
       ? {
-          activeApp:
-            'با تغییر اپ فعال، همه آمار، لاگ‌ها و عملیات انتشار برای همان اپ نمایش داده می‌شود.',
           language: 'زبان رابط کاربری داشبورد را تغییر می‌دهد.',
         }
       : {
-          activeApp:
-            'Changing active app switches all stats, logs, and release operations to that app scope.',
           language: 'Changes the dashboard interface language.',
         };
 
@@ -71,29 +55,6 @@ export function DashboardShell({
     () => navItems.filter((item) => !item.adminOnly || user.role === 'admin'),
     [user.role],
   );
-
-  const navQuery = appSlug ? `?app=${encodeURIComponent(appSlug)}` : '';
-
-  async function handleChangeApp(nextAppSlug: string): Promise<void> {
-    if (!nextAppSlug || nextAppSlug === appSlug) {
-      return;
-    }
-    try {
-      setChangingApp(true);
-      await onChangeApp(nextAppSlug);
-      toast.info(locale === 'fa' ? 'اپ فعال تغییر کرد.' : 'Active app changed.');
-    } catch (changeError) {
-      const message =
-        changeError instanceof Error
-          ? changeError.message
-          : locale === 'fa'
-            ? 'تغییر اپ فعال انجام نشد.'
-            : 'Failed to change active app.';
-      toast.error(message);
-    } finally {
-      setChangingApp(false);
-    }
-  }
 
   async function handleLogout(): Promise<void> {
     try {
@@ -113,7 +74,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="h-screen overflow-x-hidden overflow-y-hidden">
       {mobileOpen ? (
         <button
           className="fixed inset-0 z-30 bg-black/20 md:hidden"
@@ -121,10 +82,10 @@ export function DashboardShell({
           aria-label={t(locale, 'shell.closeMenu')}
         />
       ) : null}
-      <div className="mx-auto flex max-w-[1440px]">
+      <div className="mx-auto flex h-full max-w-[1440px]">
         <aside
           className={cn(
-            'fixed inset-y-0 z-40 w-64 border-border bg-white p-4 transition-transform md:static md:translate-x-0',
+            'fixed inset-y-0 z-40 w-64 overflow-y-auto border-border bg-white p-4 transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0',
             isRtl ? 'right-0 border-l md:border-r-0' : 'left-0 border-r md:border-l-0',
             mobileOpen
               ? 'translate-x-0'
@@ -159,7 +120,7 @@ export function DashboardShell({
               return (
                 <Link
                   key={item.href}
-                  href={`${item.href}${navQuery}`}
+                  href={item.href}
                   className={cn(
                     'block rounded-md px-3 py-2 text-sm transition',
                     active
@@ -175,8 +136,8 @@ export function DashboardShell({
           </nav>
         </aside>
 
-        <main className="min-h-screen flex-1 p-4 md:p-6">
-          <header className="mb-5 rounded-xl border border-border bg-white p-4 shadow-soft">
+        <main className="h-screen min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6">
+          <header className="mb-5 rounded-xl border border-border bg-white p-4 shadow-soft flex justify-between">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h1 className="text-xl font-semibold md:text-2xl">{title}</h1>
@@ -190,23 +151,7 @@ export function DashboardShell({
                 {t(locale, 'shell.openMenu')}
               </button>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <div className="min-w-[180px] space-y-1">
-                  <FieldLabel label={t(locale, 'shell.activeApp')} hint={hints.activeApp} />
-                  <Select
-                    value={appSlug}
-                    onChange={(event) => void handleChangeApp(event.target.value)}
-                    disabled={changingApp}
-                  >
-                    {apps.map((app) => (
-                      <option key={app.id} value={app.slug}>
-                        {app.name} ({app.slug})
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
+            <div className="flex justify-end">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[130px] space-y-1">
                   <FieldLabel label={t(locale, 'shell.language')} hint={hints.language} />

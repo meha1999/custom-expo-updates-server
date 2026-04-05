@@ -7,6 +7,7 @@ import {
   registerRelease,
   syncFilesystemReleases,
 } from '../../../common/controlPlaneDb';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 function getQueryValue(value: string | string[] | undefined): string | undefined {
   if (typeof value === 'string') {
@@ -32,12 +33,11 @@ export default function releasesEndpoint(req: NextApiRequest, res: NextApiRespon
   }
 
   if (req.method === 'GET') {
-    const appSlug = getQueryValue(req.query.app) ?? 'default';
     const runtimeVersion = getQueryValue(req.query.runtimeVersion);
-    syncFilesystemReleases({ appSlug, runtimeVersion });
+    syncFilesystemReleases({ appSlug: SINGLE_APP_SLUG, runtimeVersion });
     res.status(200).json({
       items: listReleases({
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         runtimeVersion,
       }),
     });
@@ -49,7 +49,6 @@ export default function releasesEndpoint(req: NextApiRequest, res: NextApiRespon
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    const appSlug = `${req.body?.appSlug ?? 'default'}`.trim();
     const runtimeVersion = `${req.body?.runtimeVersion ?? ''}`.trim();
     const bundleId = `${req.body?.bundleId ?? ''}`.trim();
     const channelName = `${req.body?.channelName ?? ''}`.trim();
@@ -61,7 +60,7 @@ export default function releasesEndpoint(req: NextApiRequest, res: NextApiRespon
 
     try {
       const release = registerRelease({
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         runtimeVersion,
         bundleId,
       });
@@ -69,7 +68,7 @@ export default function releasesEndpoint(req: NextApiRequest, res: NextApiRespon
       let policy: unknown = null;
       if (channelName) {
         policy = assignReleaseToChannel({
-          appSlug,
+          appSlug: SINGLE_APP_SLUG,
           channelName,
           runtimeVersion,
           releaseId: release.id,
@@ -83,7 +82,7 @@ export default function releasesEndpoint(req: NextApiRequest, res: NextApiRespon
       insertAdminAuditLog({
         actorUsername: user.username,
         action: 'release.register',
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         details: {
           runtimeVersion,
           bundleId,

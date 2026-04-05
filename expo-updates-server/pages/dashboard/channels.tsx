@@ -24,12 +24,12 @@ export default function ChannelsPage() {
       title={t(locale, 'channels.title')}
       subtitle={t(locale, 'channels.subtitle')}
     >
-      {({ appSlug, userRole }) => <ChannelsContent appSlug={appSlug} userRole={userRole} />}
+      {({ userRole }) => <ChannelsContent userRole={userRole} />}
     </DashboardPage>
   );
 }
 
-function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'admin' | 'viewer' }) {
+function ChannelsContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   const { locale } = useLocale();
   const toast = useToast();
   const [channels, setChannels] = useState<ChannelItem[]>([]);
@@ -74,12 +74,12 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
   useEffect(() => {
     void loadData();
-  }, [appSlug, locale]);
+  }, [locale]);
 
   async function loadData(): Promise<void> {
     try {
       const payload = await jsonFetch<{ channels: ChannelItem[]; policies: PolicyItem[] }>(
-        `/api/admin/channels?app=${encodeURIComponent(appSlug)}`,
+        '/api/admin/channels',
       );
       setChannels(payload.channels);
       setPolicies(payload.policies);
@@ -96,7 +96,6 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       await jsonFetch('/api/admin/channels', {
         method: 'POST',
         body: JSON.stringify({
-          appSlug,
           channelName: newChannelName,
         }),
       });
@@ -122,7 +121,6 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       await jsonFetch('/api/admin/channels', {
         method: 'PUT',
         body: JSON.stringify({
-          appSlug,
           channelName: policyChannelName,
           runtimeVersion: policyRuntimeVersion,
           activeReleaseId: policyActiveReleaseId.trim() ? Number(policyActiveReleaseId) : null,
@@ -147,7 +145,7 @@ function ChannelsContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
   function buildManifestUrl(channelName: string): string {
     const origin = typeof window === 'undefined' ? '' : window.location.origin;
-    return `${origin}/api/manifest?app=${encodeURIComponent(appSlug)}&channel=${encodeURIComponent(channelName)}`;
+    return `${origin}/api/manifest?channel=${encodeURIComponent(channelName)}`;
   }
 
   function countPolicyEntries(value: string): number {

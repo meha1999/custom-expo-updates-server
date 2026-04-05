@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { DashboardPage } from '../../components/layout/dashboard-page';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -24,12 +24,12 @@ export default function ReleasesPage() {
       title={t(locale, 'releases.title')}
       subtitle={t(locale, 'releases.subtitle')}
     >
-      {({ appSlug, userRole }) => <ReleasesContent appSlug={appSlug} userRole={userRole} />}
+      {({ userRole }) => <ReleasesContent userRole={userRole} />}
     </DashboardPage>
   );
 }
 
-function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'admin' | 'viewer' }) {
+function ReleasesContent({ userRole }: { userRole: 'admin' | 'viewer' }) {
   const { locale } = useLocale();
   const toast = useToast();
   const [runtimeVersion, setRuntimeVersion] = useState('1');
@@ -46,6 +46,12 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [releases, setReleases] = useState<ReleaseItem[]>([]);
   const [audit, setAudit] = useState<DashboardPayload['recentAuditLogs']>([]);
+  const [auditActor, setAuditActor] = useState('');
+  const [auditAction, setAuditAction] = useState('');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditFromDate, setAuditFromDate] = useState('');
+  const [auditToDate, setAuditToDate] = useState('');
+  const [expandedAuditId, setExpandedAuditId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [registeringRelease, setRegisteringRelease] = useState(false);
@@ -88,14 +94,14 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
 
   useEffect(() => {
     void loadData();
-  }, [appSlug, locale]);
+  }, [locale]);
 
   async function loadData(): Promise<void> {
     try {
       const [releaseResp, dashboardResp, channelsResp] = await Promise.all([
-        jsonFetch<{ items: ReleaseItem[] }>(`/api/admin/releases?app=${encodeURIComponent(appSlug)}`),
-        jsonFetch<DashboardPayload>(`/api/dashboard?app=${encodeURIComponent(appSlug)}&limit=40`),
-        jsonFetch<{ channels: ChannelItem[] }>(`/api/admin/channels?app=${encodeURIComponent(appSlug)}`),
+        jsonFetch<{ items: ReleaseItem[] }>('/api/admin/releases'),
+        jsonFetch<DashboardPayload>('/api/dashboard?limit=40'),
+        jsonFetch<{ channels: ChannelItem[] }>('/api/admin/channels'),
       ]);
       setReleases(releaseResp.items);
       setAudit(dashboardResp.recentAuditLogs);
@@ -117,6 +123,32 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
   const latestRelease = releases.length > 0 ? releases[0] : null;
   const rollbackReleases = releases.filter((item) => item.isRollback).length;
   const selectedUploadBytes = uploadFiles.reduce((sum, file) => sum + file.size, 0);
+  const auditActions = useMemo(
+    () => Array.from(new Set(audit.map((entry) => entry.action))).sort((a, b) => a.localeCompare(b)),
+    [audit],
+  );
+  const auditActors = useMemo(
+    () =>
+      Array.from(new Set(audit.map((entry) => entry.actorUsername))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [audit],
+  );
+  const filteredAudit = useMemo(() => {
+    const searchTerm = auditSearch.trim().toLowerCase();
+    const fromTs = auditFromDate ? new Date(`${auditFromDate}T00:00:00`).getTime() : null;
+    const toTs = auditToDate ? new Date(`${auditToDate}T23:59:59.999`).getTime() : null;
+    return audit.filter((entry) => {
+      if (auditActor && entry.actorUsername !== auditActor) return false;
+      if (auditAction && entry.action !== auditAction) return false;
+      const entryTs = new Date(entry.timestamp).getTime();
+      if (fromTs !== null && Number.isFinite(fromTs) && entryTs < fromTs) return false;
+      if (toTs !== null && Number.isFinite(toTs) && entryTs > toTs) return false;
+      if (!searchTerm) return true;
+      const bag = `${entry.actorUsername} ${entry.action} ${entry.detailsJson}`.toLowerCase();
+      return bag.includes(searchTerm);
+    });
+  }, [audit, auditActor, auditAction, auditSearch, auditFromDate, auditToDate]);
 
   function normalizeUploadPath(file: File): string {
     const withRelative = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
@@ -158,6 +190,96 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
     setUploadFiles(Array.from(fileList));
   }
 
+  function inferBundleIdFromPaths(paths: string[]): string | null {
+    if (paths.length === 0) return null;
+
+    const uniqueFirstSegments = Array.from(
+      new Set(
+        paths
+          .map((item) => item.split('/').filter(Boolean)[0])
+          .filter((item): item is string => Boolean(item)),
+      ),
+    );
+
+    if (uniqueFirstSegments.length === 1) {
+      const candidate = uniqueFirstSegments[0];
+      const hasMetadata = paths.some((path) => path === `${candidate}/metadata.json`);
+      const hasExpoConfig = paths.some((path) => path === `${candidate}/expoConfig.json`);
+      if (hasMetadata || hasExpoConfig) {
+        return candidate;
+      }
+    }
+
+    const updatesMatch = paths.find((path) => {
+      const segments = path.split('/').filter(Boolean);
+      return segments.length >= 4 && segments[0] === 'updates';
+    });
+    if (!updatesMatch) return null;
+    const segments = updatesMatch.split('/').filter(Boolean);
+    return segments[2] ?? null;
+  }
+
+  function inferRuntimeFromPaths(paths: string[]): string | null {
+    const updatesMatch = paths.find((path) => {
+      const segments = path.split('/').filter(Boolean);
+      return segments.length >= 4 && segments[0] === 'updates';
+    });
+    if (!updatesMatch) return null;
+    const segments = updatesMatch.split('/').filter(Boolean);
+    return segments[1] ?? null;
+  }
+
+  async function inferRuntimeFromExpoConfig(files: File[]): Promise<string | null> {
+    const expoConfigFile = files.find((file) => normalizeUploadPath(file).endsWith('/expoConfig.json'));
+    if (!expoConfigFile) return null;
+    try {
+      const parsed = JSON.parse(await expoConfigFile.text()) as { runtimeVersion?: unknown };
+      if (typeof parsed.runtimeVersion === 'string' && parsed.runtimeVersion.trim()) {
+        return parsed.runtimeVersion.trim();
+      }
+      if (typeof parsed.runtimeVersion === 'number') {
+        return String(parsed.runtimeVersion);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleAutofillUploadForm(): Promise<void> {
+    const fallbackRuntime = latestRelease?.runtimeVersion ?? uploadRuntimeVersion ?? '1';
+    const fallbackBundle = uploadBundleId.trim() ? uploadBundleId : `${Date.now()}`;
+
+    if (uploadFiles.length === 0) {
+      setUploadRuntimeVersion(fallbackRuntime);
+      setUploadBundleId(fallbackBundle);
+      toast.info(
+        locale === 'fa'
+          ? 'فایلی انتخاب نشده بود. فرم با اطلاعات موجود تکمیل شد.'
+          : 'No files selected. Form was filled from existing info.',
+      );
+      return;
+    }
+
+    const normalizedPaths = uploadFiles.map((file) => normalizeUploadPath(file));
+    const inferredBundle = inferBundleIdFromPaths(normalizedPaths);
+    const inferredRuntimeFromPath = inferRuntimeFromPaths(normalizedPaths);
+    const inferredRuntimeFromConfig = await inferRuntimeFromExpoConfig(uploadFiles);
+    const inferredRuntime = inferredRuntimeFromConfig ?? inferredRuntimeFromPath ?? fallbackRuntime;
+
+    setUploadRuntimeVersion(inferredRuntime || fallbackRuntime);
+    setUploadBundleId(inferredBundle || fallbackBundle);
+    if (!uploadChannelName && channelOptions[0]) {
+      setUploadChannelName(channelOptions[0]);
+    }
+
+    toast.success(
+      locale === 'fa'
+        ? 'فرم از فایل‌ها به‌صورت خودکار پر شد. در صورت نیاز می‌توانید تغییر دهید.'
+        : 'Form was auto-filled from files. You can still edit fields.',
+    );
+  }
+
   async function handleRegisterRelease(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
@@ -165,7 +287,6 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       await jsonFetch('/api/admin/releases', {
         method: 'POST',
         body: JSON.stringify({
-          appSlug,
           runtimeVersion,
           bundleId,
           channelName,
@@ -225,7 +346,6 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       await jsonFetch('/api/admin/upload-release', {
         method: 'POST',
         body: JSON.stringify({
-          appSlug,
           runtimeVersion: uploadRuntimeVersion.trim(),
           bundleId: uploadBundleId.trim(),
           channelName: uploadChannelName,
@@ -261,7 +381,6 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       await jsonFetch('/api/admin/promote', {
         method: 'POST',
         body: JSON.stringify({
-          appSlug,
           sourceChannelName: sourceChannel,
           targetChannelName: targetChannel,
           runtimeVersion,
@@ -299,7 +418,6 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       await jsonFetch('/api/admin/rollback', {
         method: 'POST',
         body: JSON.stringify({
-          appSlug,
           channelName: rollbackChannel,
           runtimeVersion,
         }),
@@ -315,6 +433,18 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
       toast.error(failure);
     } finally {
       setRollingBack(false);
+    }
+  }
+
+  async function handleCopyAuditDetails(detailsJson: string): Promise<void> {
+    if (typeof navigator === 'undefined') {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(detailsJson);
+      toast.success(locale === 'fa' ? 'جزئیات کپی شد.' : 'Details copied.');
+    } catch {
+      toast.error(locale === 'fa' ? 'کپی انجام نشد.' : 'Failed to copy details.');
     }
   }
 
@@ -625,13 +755,22 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
                   </p>
                 </div>
                 <div className="xl:col-span-4">
-                  <Button
-                    type="submit"
-                    loading={uploadingFiles}
-                    loadingText={locale === 'fa' ? 'در حال آپلود...' : 'Uploading...'}
-                  >
-                    {locale === 'fa' ? 'آپلود و ثبت نسخه' : 'Upload And Register Release'}
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleAutofillUploadForm()}
+                    >
+                      {locale === 'fa' ? 'تکمیل خودکار' : 'Auto-fill'}
+                    </Button>
+                    <Button
+                      type="submit"
+                      loading={uploadingFiles}
+                      loadingText={locale === 'fa' ? 'در حال آپلود...' : 'Uploading...'}
+                    >
+                      {locale === 'fa' ? 'آپلود و ثبت نسخه' : 'Upload And Register Release'}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </CardContent>
@@ -694,38 +833,134 @@ function ReleasesContent({ appSlug, userRole }: { appSlug: string; userRole: 'ad
           <CardHeader>
             <CardTitle>{t(locale, 'releases.audit.title')}</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-auto">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t(locale, 'releases.audit.time')}</Th>
-                  <Th>{t(locale, 'releases.audit.actor')}</Th>
-                  <Th>{locale === 'fa' ? 'اپ' : 'App'}</Th>
-                  <Th>{t(locale, 'releases.audit.action')}</Th>
-                  <Th>{locale === 'fa' ? 'جزئیات' : 'Details'}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {audit.slice(0, 30).map((entry) => (
-                  <tr key={entry.id}>
-                    <Td>{formatDate(entry.timestamp, locale)}</Td>
-                    <Td>{entry.actorUsername}</Td>
-                    <Td>
-                      <Badge variant="muted">{entry.appSlug}</Badge>
-                    </Td>
-                    <Td>
-                      <Badge variant="default">{entry.action}</Badge>
-                    </Td>
-                    <Td>
-                      <p className="max-w-[560px] break-all text-xs text-muted-foreground">{entry.detailsJson}</p>
-                    </Td>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-5">
+              <div className="space-y-1">
+                <FieldLabel
+                  label={locale === 'fa' ? 'کاربر' : 'Actor'}
+                  hint={locale === 'fa' ? 'فیلتر بر اساس نام کاربری' : 'Filter by actor username'}
+                />
+                <Select value={auditActor} onChange={(event) => setAuditActor(event.target.value)}>
+                  <option value="">{locale === 'fa' ? 'همه' : 'All'}</option>
+                  {auditActors.map((actor) => (
+                    <option key={actor} value={actor}>
+                      {actor}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <FieldLabel
+                  label={locale === 'fa' ? 'عملیات' : 'Action'}
+                  hint={locale === 'fa' ? 'فیلتر بر اساس نوع عملیات' : 'Filter by action type'}
+                />
+                <Select value={auditAction} onChange={(event) => setAuditAction(event.target.value)}>
+                  <option value="">{locale === 'fa' ? 'همه' : 'All'}</option>
+                  {auditActions.map((action) => (
+                    <option key={action} value={action}>
+                      {action}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <FieldLabel
+                  label={locale === 'fa' ? 'از تاریخ' : 'From date'}
+                  hint={locale === 'fa' ? 'شروع بازه زمانی' : 'Start date'}
+                />
+                <Input type="date" value={auditFromDate} onChange={(event) => setAuditFromDate(event.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel
+                  label={locale === 'fa' ? 'تا تاریخ' : 'To date'}
+                  hint={locale === 'fa' ? 'پایان بازه زمانی' : 'End date'}
+                />
+                <Input type="date" value={auditToDate} onChange={(event) => setAuditToDate(event.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <FieldLabel
+                  label={locale === 'fa' ? 'جستجو' : 'Search'}
+                  hint={locale === 'fa' ? 'جستجو در عملیات و جزئیات' : 'Search action/details'}
+                />
+                <Input
+                  value={auditSearch}
+                  onChange={(event) => setAuditSearch(event.target.value)}
+                  placeholder={locale === 'fa' ? 'متن جستجو' : 'Search text'}
+                />
+              </div>
+            </div>
+            <div className="overflow-auto">
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>{t(locale, 'releases.audit.time')}</Th>
+                    <Th>{t(locale, 'releases.audit.actor')}</Th>
+                    <Th>{locale === 'fa' ? 'اپ' : 'App'}</Th>
+                    <Th>{t(locale, 'releases.audit.action')}</Th>
+                    <Th>{locale === 'fa' ? 'جزئیات' : 'Details'}</Th>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
+                </thead>
+                <tbody>
+                  {filteredAudit.slice(0, 100).map((entry) => (
+                    <tr key={entry.id}>
+                      <Td>{formatDate(entry.timestamp, locale)}</Td>
+                      <Td>{entry.actorUsername}</Td>
+                      <Td>
+                        <Badge variant="muted">{entry.appSlug}</Badge>
+                      </Td>
+                      <Td>
+                        <Badge variant="default">{entry.action}</Badge>
+                      </Td>
+                      <Td>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                setExpandedAuditId((current) =>
+                                  current === entry.id ? null : entry.id,
+                                )
+                              }
+                            >
+                              {expandedAuditId === entry.id
+                                ? locale === 'fa'
+                                  ? 'بستن'
+                                  : 'Collapse'
+                                : locale === 'fa'
+                                  ? 'نمایش'
+                                  : 'Expand'}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleCopyAuditDetails(entry.detailsJson)}
+                            >
+                              {locale === 'fa' ? 'کپی' : 'Copy'}
+                            </Button>
+                          </div>
+                          {expandedAuditId === entry.id ? (
+                            <pre className="max-w-[640px] overflow-auto rounded border border-border bg-muted p-2 text-xs text-muted-foreground">
+                              {entry.detailsJson}
+                            </pre>
+                          ) : (
+                            <p className="max-w-[560px] break-all text-xs text-muted-foreground line-clamp-2">
+                              {entry.detailsJson}
+                            </p>
+                          )}
+                        </div>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </section>
     </div>
   );
 }
+

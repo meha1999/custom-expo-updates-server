@@ -19,12 +19,12 @@ export default function LogsPage() {
   const { locale } = useLocale();
   return (
     <DashboardPage title={t(locale, 'logs.title')} subtitle={t(locale, 'logs.subtitle')}>
-      {({ appSlug }) => <LogsContent appSlug={appSlug} />}
+      {() => <LogsContent />}
     </DashboardPage>
   );
 }
 
-function LogsContent({ appSlug }: { appSlug: string }) {
+function LogsContent() {
   const { locale } = useLocale();
   const toast = useToast();
   const [search, setSearch] = useState('');
@@ -49,13 +49,12 @@ function LogsContent({ appSlug }: { appSlug: string }) {
 
   useEffect(() => {
     void load(false);
-  }, [appSlug, search, eventType, status, page, locale]);
+  }, [search, eventType, status, page, locale]);
 
   async function load(showSuccessToast: boolean): Promise<void> {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        app: appSlug,
         page: String(page),
         pageSize: String(PAGE_SIZE),
       });
@@ -79,14 +78,13 @@ function LogsContent({ appSlug }: { appSlug: string }) {
 
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams({
-      app: appSlug,
       format: 'csv',
     });
     if (search) params.set('search', search);
     if (eventType) params.set('eventType', eventType);
     if (status) params.set('status', status);
     return `/api/admin/logs?${params.toString()}`;
-  }, [appSlug, search, eventType, status]);
+  }, [search, eventType, status]);
 
   return (
     <div className="space-y-4">

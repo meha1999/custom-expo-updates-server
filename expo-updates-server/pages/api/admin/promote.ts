@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '../../../common/auth';
 import { insertAdminAuditLog, promoteRelease } from '../../../common/controlPlaneDb';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 export default function promoteEndpoint(req: NextApiRequest, res: NextApiResponse) {
   const admin = requireAuth(req, res, { role: 'admin' });
@@ -13,7 +14,6 @@ export default function promoteEndpoint(req: NextApiRequest, res: NextApiRespons
     return;
   }
 
-  const appSlug = `${req.body?.appSlug ?? 'default'}`.trim();
   const sourceChannelName = `${req.body?.sourceChannelName ?? ''}`.trim();
   const targetChannelName = `${req.body?.targetChannelName ?? ''}`.trim();
   const runtimeVersion = `${req.body?.runtimeVersion ?? ''}`.trim();
@@ -24,7 +24,7 @@ export default function promoteEndpoint(req: NextApiRequest, res: NextApiRespons
 
   try {
     const policy = promoteRelease({
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       sourceChannelName,
       targetChannelName,
       runtimeVersion,
@@ -32,7 +32,7 @@ export default function promoteEndpoint(req: NextApiRequest, res: NextApiRespons
     insertAdminAuditLog({
       actorUsername: admin.username,
       action: 'release.promote',
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       details: {
         sourceChannelName,
         targetChannelName,

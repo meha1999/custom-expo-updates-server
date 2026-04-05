@@ -6,9 +6,14 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function Th({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cn('px-3 py-2 text-left text-xs uppercase tracking-wide text-muted-foreground', className)} {...props} />;
+  return (
+    <th
+      className={cn('px-3 py-2 text-start text-xs uppercase tracking-wide text-muted-foreground', className)}
+      {...props}
+    />
+  );
 }
 
 export function Td({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('px-3 py-2 align-top border-t border-border/70', className)} {...props} />;
+  return <td className={cn('px-3 py-2 align-top border-t border-border/70 text-start', className)} {...props} />;
 }

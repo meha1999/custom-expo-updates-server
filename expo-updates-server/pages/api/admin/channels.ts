@@ -7,6 +7,7 @@ import {
   listRuntimePolicies,
   setRuntimePolicy,
 } from '../../../common/controlPlaneDb';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 function getQueryValue(value: string | string[] | undefined): string | undefined {
   if (typeof value === 'string') {
@@ -32,11 +33,10 @@ export default function channelsEndpoint(req: NextApiRequest, res: NextApiRespon
   }
 
   if (req.method === 'GET') {
-    const appSlug = getQueryValue(req.query.app) ?? 'default';
     res.status(200).json({
-      channels: listChannels(appSlug),
+      channels: listChannels(SINGLE_APP_SLUG),
       policies: listRuntimePolicies({
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         channelName: getQueryValue(req.query.channel),
       }),
     });
@@ -48,18 +48,17 @@ export default function channelsEndpoint(req: NextApiRequest, res: NextApiRespon
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    const appSlug = `${req.body?.appSlug ?? 'default'}`.trim();
     const channelName = `${req.body?.channelName ?? ''}`.trim();
     if (!channelName) {
       res.status(400).json({ error: 'channelName is required' });
       return;
     }
     try {
-      const created = createChannel(appSlug, channelName);
+      const created = createChannel(SINGLE_APP_SLUG, channelName);
       insertAdminAuditLog({
         actorUsername: user.username,
         action: 'channel.create',
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         details: {
           channelName,
         },
@@ -76,7 +75,6 @@ export default function channelsEndpoint(req: NextApiRequest, res: NextApiRespon
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    const appSlug = `${req.body?.appSlug ?? 'default'}`.trim();
     const channelName = `${req.body?.channelName ?? ''}`.trim();
     const runtimeVersion = `${req.body?.runtimeVersion ?? ''}`.trim();
     if (!channelName || !runtimeVersion) {
@@ -93,7 +91,7 @@ export default function channelsEndpoint(req: NextApiRequest, res: NextApiRespon
           : Number(rawActiveReleaseId);
 
       const policy = setRuntimePolicy({
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         channelName,
         runtimeVersion,
         activeReleaseId: parsedActiveReleaseId,
@@ -107,7 +105,7 @@ export default function channelsEndpoint(req: NextApiRequest, res: NextApiRespon
       insertAdminAuditLog({
         actorUsername: user.username,
         action: 'channel.policy.update',
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         details: {
           channelName,
           runtimeVersion,

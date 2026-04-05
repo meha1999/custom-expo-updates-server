@@ -7,6 +7,7 @@ import {
   insertAdminAuditLog,
   registerRelease,
 } from '../../../common/controlPlaneDb';
+import { SINGLE_APP_SLUG } from '../../../common/singleApp';
 
 interface UploadFileInput {
   path: string;
@@ -130,7 +131,6 @@ export default function uploadReleaseEndpoint(req: NextApiRequest, res: NextApiR
     return;
   }
 
-  const appSlug = `${req.body?.appSlug ?? 'default'}`.trim();
   const runtimeVersion = `${req.body?.runtimeVersion ?? ''}`.trim();
   const bundleId = `${req.body?.bundleId ?? ''}`.trim();
   const channelName = `${req.body?.channelName ?? ''}`.trim();
@@ -152,7 +152,7 @@ export default function uploadReleaseEndpoint(req: NextApiRequest, res: NextApiR
     });
 
     const release = registerRelease({
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       runtimeVersion,
       bundleId,
     });
@@ -160,7 +160,7 @@ export default function uploadReleaseEndpoint(req: NextApiRequest, res: NextApiR
     let policy: unknown = null;
     if (channelName) {
       policy = assignReleaseToChannel({
-        appSlug,
+        appSlug: SINGLE_APP_SLUG,
         channelName,
         runtimeVersion,
         releaseId: release.id,
@@ -174,7 +174,7 @@ export default function uploadReleaseEndpoint(req: NextApiRequest, res: NextApiR
     insertAdminAuditLog({
       actorUsername: user.username,
       action: 'release.upload',
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       details: {
         runtimeVersion,
         bundleId,

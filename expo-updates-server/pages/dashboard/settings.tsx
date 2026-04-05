@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { DashboardPage } from '../../components/layout/dashboard-page';
+import { useToast } from '../../components/providers/toast-provider';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -9,7 +10,6 @@ import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, Td, Th } from '../../components/ui/table';
 import { Textarea } from '../../components/ui/textarea';
-import { useToast } from '../../components/providers/toast-provider';
 import { useLocale } from '../../hooks/use-locale';
 import { formatDate } from '../../lib/format';
 import { jsonFetch } from '../../lib/http';
@@ -19,18 +19,8 @@ import { AppItem, AuthUser, ChannelItem } from '../../lib/types';
 export default function SettingsPage() {
   const { locale } = useLocale();
   return (
-    <DashboardPage
-      title={t(locale, 'settings.title')}
-      subtitle={t(locale, 'settings.subtitle')}
-    >
-      {({ appSlug, userRole, setApp, refreshApps }) => (
-        <SettingsContent
-          activeAppSlug={appSlug}
-          userRole={userRole}
-          setApp={setApp}
-          refreshApps={refreshApps}
-        />
-      )}
+    <DashboardPage title={t(locale, 'settings.title')} subtitle={t(locale, 'settings.subtitle')}>
+      {({ appSlug, userRole }) => <SettingsContent activeAppSlug={appSlug} userRole={userRole} />}
     </DashboardPage>
   );
 }
@@ -38,72 +28,127 @@ export default function SettingsPage() {
 function SettingsContent({
   activeAppSlug,
   userRole,
-  setApp,
-  refreshApps,
 }: {
   activeAppSlug: string;
   userRole: 'admin' | 'viewer';
-  setApp: (slug: string) => Promise<void>;
-  refreshApps: () => Promise<void>;
 }) {
   const { locale } = useLocale();
   const toast = useToast();
-  const [apps, setApps] = useState<AppItem[]>([]);
+  const copy =
+    locale === 'fa'
+      ? {
+          singleAppMode: 'حالت تک‌اپلیکیشن برای این سرور فعال است.',
+          appLabel: 'اپ',
+          defaultAppName: 'اپ پیش‌فرض',
+          updateUrlsByChannel: 'لینک‌های آپدیت بر اساس کانال',
+          noChannels: 'هنوز کانالی وجود ندارد.',
+          codeSigningTitle: 'امضای کد (اختیاری)',
+          codeSigningDesc:
+            'تنظیم امضا برای اپ فعلی. اگر کلید خالی باشد، از تنظیم سراسری محیط استفاده می‌شود.',
+          keyConfigured: 'کلید تنظیم شده',
+          noAppKey: 'کلید اپ تنظیم نشده',
+          keyIdLabel: 'شناسه کلید',
+          keyIdHint: 'باید با updates.codeSigningMetadata.keyid در کلاینت یکسان باشد.',
+          privateKeyLabel: 'کلید خصوصی (PEM)',
+          privateKeyHint: 'اختیاری. برای افزودن یا چرخش کلید، PEM را Paste کنید.',
+          saveSigning: 'ذخیره تنظیمات امضا',
+          clearAppKey: 'حذف کلید اپ',
+          signingSaved: 'تنظیمات امضا ذخیره شد.',
+          keyRemoved: 'کلید خصوصی حذف شد.',
+          permissionScope: 'سطح دسترسی',
+          fullAccess: 'دسترسی کامل به انتشار، تنظیمات و عملیات',
+          readOnly: 'فقط مشاهده داشبورد و گزارش‌ها',
+          lastRefreshed: 'آخرین بروزرسانی',
+          createUserSuccess: 'کاربر جدید ایجاد شد.',
+          changePasswordTitle: 'تغییر رمز عبور',
+          changePasswordDesc: 'رمز عبور حساب فعلی خود را تغییر دهید.',
+          currentPassword: 'رمز عبور فعلی',
+          currentPasswordHint: 'برای تایید هویت لازم است.',
+          newPassword: 'رمز عبور جدید',
+          newPasswordHint: 'حداقل ۸ کاراکتر.',
+          updatePassword: 'بروزرسانی رمز',
+          passwordUpdated: 'رمز عبور بروزرسانی شد.',
+          usernameHint: 'نام کاربری حساب جدید.',
+          passwordHint: 'رمز عبور اولیه کاربر.',
+          roleHint: 'سطح دسترسی کاربر.',
+          saving: 'در حال ذخیره...',
+          clearing: 'در حال حذف...',
+          creating: 'در حال ایجاد...',
+          updating: 'در حال بروزرسانی...',
+        }
+      : {
+          singleAppMode: 'Single-app mode is enabled for this server.',
+          appLabel: 'App',
+          defaultAppName: 'Default App',
+          updateUrlsByChannel: 'Update URLs by channel',
+          noChannels: 'No channels exist yet.',
+          codeSigningTitle: 'Code Signing (optional)',
+          codeSigningDesc:
+            'Configure signing for the single app. If key is empty, signing falls back to global env config.',
+          keyConfigured: 'Key configured',
+          noAppKey: 'No app key',
+          keyIdLabel: 'Key ID',
+          keyIdHint: 'Must match updates.codeSigningMetadata.keyid in the client app.',
+          privateKeyLabel: 'Private Key (PEM)',
+          privateKeyHint: 'Optional. Paste PEM here to add or rotate key.',
+          saveSigning: 'Save Signing Settings',
+          clearAppKey: 'Clear App Key',
+          signingSaved: 'Code signing settings saved.',
+          keyRemoved: 'Private key removed.',
+          permissionScope: 'Permission Scope',
+          fullAccess: 'Full access to releases, settings, and operations',
+          readOnly: 'Read-only access to dashboard and logs',
+          lastRefreshed: 'Last refreshed',
+          createUserSuccess: 'User created successfully.',
+          changePasswordTitle: 'Change Password',
+          changePasswordDesc: 'Update the password for your current account.',
+          currentPassword: 'Current Password',
+          currentPasswordHint: 'Required to verify your identity.',
+          newPassword: 'New Password',
+          newPasswordHint: 'Minimum 8 characters.',
+          updatePassword: 'Update Password',
+          passwordUpdated: 'Password updated.',
+          usernameHint: 'Username for the new account.',
+          passwordHint: 'Initial password for the user.',
+          roleHint: 'Access level for the user.',
+          saving: 'Saving...',
+          clearing: 'Clearing...',
+          creating: 'Creating...',
+          updating: 'Updating...',
+        };
+  const [app, setApp] = useState<AppItem | null>(null);
   const [channels, setChannels] = useState<ChannelItem[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [createdApp, setCreatedApp] = useState<AppItem | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const [appName, setAppName] = useState('');
-  const [appSlugInput, setAppSlugInput] = useState('');
   const [signingKeyId, setSigningKeyId] = useState('main');
   const [signingPrivateKeyPem, setSigningPrivateKeyPem] = useState('');
+  const [savingSigning, setSavingSigning] = useState(false);
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
-  const [creatingApp, setCreatingApp] = useState(false);
-  const [savingSigning, setSavingSigning] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
-  const [showCreateAppModal, setShowCreateAppModal] = useState(false);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
-  const hints =
-    locale === 'fa'
-      ? {
-          appName: 'نام نمایشی اپ در پنل مدیریت.',
-          appSlug: 'شناسه یکتا برای اپ که در API و فیلترها استفاده می‌شود.',
-          username: 'نام کاربری حساب جدید برای ورود به داشبورد.',
-          password: 'رمز عبور اولیه کاربر جدید.',
-          role: 'سطح دسترسی کاربر. مدیر دسترسی کامل دارد، مشاهده‌گر فقط خواندن.',
-        }
-      : {
-          appName: 'Display name of the app in the management panel.',
-          appSlug: 'Unique app identifier used in API calls and filtering.',
-          username: 'Username for the new dashboard account.',
-          password: 'Initial password for the new user.',
-          role: 'Access level. Admin has full access, viewer is read-only.',
-        };
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     void load();
-  }, [activeAppSlug, userRole, locale]);
-
-  useEffect(() => {
-    const activeApp = apps.find((app) => app.slug === activeAppSlug);
-    setSigningKeyId(activeApp?.codeSigningKeyId || 'main');
-    setSigningPrivateKeyPem('');
-  }, [apps, activeAppSlug]);
+  }, [activeAppSlug, userRole]);
 
   async function load(): Promise<void> {
     try {
       const [appResp, channelResp] = await Promise.all([
         jsonFetch<{ items: AppItem[] }>('/api/admin/apps'),
-        jsonFetch<{ channels: ChannelItem[] }>(
-          `/api/admin/channels?app=${encodeURIComponent(activeAppSlug)}`,
-        ),
+        jsonFetch<{ channels: ChannelItem[] }>('/api/admin/channels'),
       ]);
-      setApps(appResp.items);
+      setApp(appResp.items[0] ?? null);
       setChannels(channelResp.channels);
+      setSigningKeyId(appResp.items[0]?.codeSigningKeyId || 'main');
+      setSigningPrivateKeyPem('');
       if (userRole === 'admin') {
         const userResp = await jsonFetch<{ items: AuthUser[] }>('/api/admin/users');
         setUsers(userResp.items);
@@ -114,66 +159,11 @@ function SettingsContent({
     }
   }
 
-  async function handleCreateApp(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    try {
-      setCreatingApp(true);
-      const created = await jsonFetch<AppItem>('/api/admin/apps', {
-        method: 'POST',
-        body: JSON.stringify({ name: appName, slug: appSlugInput || undefined }),
-      });
-      setCreatedApp(created);
-      setCopiedKey(null);
-      setAppName('');
-      setAppSlugInput('');
-      await load();
-      await refreshApps();
-      await setApp(created.slug);
-      const createdChannels = await jsonFetch<{ channels: ChannelItem[] }>(
-        `/api/admin/channels?app=${encodeURIComponent(created.slug)}`,
-      );
-      setChannels(createdChannels.channels);
-      setShowCreateAppModal(false);
-      toast.success(locale === 'fa' ? 'اپ جدید با موفقیت ایجاد شد.' : 'App created successfully.');
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
-      setError(message);
-      toast.error(message);
-    } finally {
-      setCreatingApp(false);
-    }
-  }
-
-  async function handleCreateUser(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    try {
-      setCreatingUser(true);
-      await jsonFetch('/api/admin/users', {
-        method: 'POST',
-        body: JSON.stringify({ username, password, role }),
-      });
-      setUsername('');
-      setPassword('');
-      await load();
-      setShowCreateUserModal(false);
-      toast.success(locale === 'fa' ? 'کاربر جدید ایجاد شد.' : 'User created successfully.');
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
-      setError(message);
-      toast.error(message);
-    } finally {
-      setCreatingUser(false);
-    }
-  }
-
   async function handleSaveSigning(event: FormEvent): Promise<void> {
     event.preventDefault();
     try {
       setSavingSigning(true);
       const payload: Record<string, unknown> = {
-        appSlug: activeAppSlug,
         codeSigningKeyId: signingKeyId || 'main',
       };
       if (signingPrivateKeyPem.trim()) {
@@ -184,9 +174,7 @@ function SettingsContent({
         body: JSON.stringify(payload),
       });
       await load();
-      await refreshApps();
-      setSigningPrivateKeyPem('');
-      toast.success(locale === 'fa' ? 'تنظیمات امضای کد ذخیره شد.' : 'Code signing settings saved.');
+      toast.success(copy.signingSaved);
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
@@ -203,14 +191,11 @@ function SettingsContent({
       await jsonFetch<AppItem>('/api/admin/apps', {
         method: 'PATCH',
         body: JSON.stringify({
-          appSlug: activeAppSlug,
           clearCodeSigningPrivateKey: true,
         }),
       });
       await load();
-      await refreshApps();
-      setSigningPrivateKeyPem('');
-      toast.success(locale === 'fa' ? 'کلید خصوصی این اپ حذف شد.' : 'Private key removed for this app.');
+      toast.success(copy.keyRemoved);
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
@@ -221,26 +206,56 @@ function SettingsContent({
     }
   }
 
-  function buildManifestUrl(targetAppSlug: string, channelName: string): string {
-    const origin = typeof window === 'undefined' ? '' : window.location.origin;
-    return `${origin}/api/manifest?app=${encodeURIComponent(targetAppSlug)}&channel=${encodeURIComponent(channelName)}`;
+  async function handleCreateUser(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    try {
+      setCreatingUser(true);
+      await jsonFetch('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, role }),
+      });
+      setUsername('');
+      setPassword('');
+      await load();
+      setShowCreateUserModal(false);
+      toast.success(copy.createUserSuccess);
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setCreatingUser(false);
+    }
   }
 
-  const manifestUrl = createdApp ? buildManifestUrl(createdApp.slug, 'production') : null;
-  const activeApp = apps.find((app) => app.slug === activeAppSlug);
-
-  async function copyValue(value: string, key: string): Promise<void> {
-    if (!value || typeof navigator === 'undefined') {
-      return;
-    }
+  async function handleChangePassword(event: FormEvent): Promise<void> {
+    event.preventDefault();
     try {
-      await navigator.clipboard.writeText(value);
-      setCopiedKey(key);
-      toast.success(locale === 'fa' ? 'URL کپی شد.' : 'URL copied.');
-    } catch {
-      setCopiedKey(null);
-      toast.error(locale === 'fa' ? 'کپی URL انجام نشد.' : 'Failed to copy URL.');
+      setChangingPassword(true);
+      await jsonFetch('/api/admin/users', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      toast.success(copy.passwordUpdated);
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : t(locale, 'settings.failedLoad');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setChangingPassword(false);
     }
+  }
+
+  function buildManifestUrl(channelName: string): string {
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    return `${origin}/api/manifest?channel=${encodeURIComponent(channelName)}`;
   }
 
   return (
@@ -248,125 +263,53 @@ function SettingsContent({
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div>
-            <CardTitle>{t(locale, 'settings.apps.title')}</CardTitle>
-            <CardDescription>{t(locale, 'settings.apps.description')}</CardDescription>
-          </div>
-          {userRole === 'admin' ? (
-            <Button type="button" onClick={() => setShowCreateAppModal(true)}>
-              {t(locale, 'settings.apps.create')}
-            </Button>
-          ) : null}
+        <CardHeader>
+          <CardTitle>{t(locale, 'settings.apps.title')}</CardTitle>
+          <CardDescription>{copy.singleAppMode}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {createdApp && manifestUrl ? (
-            <div className="space-y-2 rounded-md border border-success/30 bg-success/10 p-3">
-              <p className="text-sm font-medium text-success">
-                {locale === 'fa'
-                  ? `آدرس آپدیت برای اپ ${createdApp.name} آماده است`
-                  : `Update URL for ${createdApp.name} is ready`}
-              </p>
-              <p className="break-all rounded border border-border bg-white px-2 py-1 text-xs">
-                {manifestUrl}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => void copyValue(manifestUrl, 'created')}>
-                  {locale === 'fa' ? 'کپی URL' : 'Copy URL'}
-                </Button>
-                {copiedKey === 'created' ? (
-                  <span className="text-xs text-success">
-                    {locale === 'fa' ? 'کپی شد' : 'Copied'}
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {locale === 'fa'
-                  ? 'این مقدار را داخل app.json در مسیر updates.url قرار دهید.'
-                  : 'Paste this value into app.json as updates.url.'}
-              </p>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-2 text-sm">
+            <Badge variant="muted">{copy.appLabel}</Badge>
+            <span className="font-medium">{app?.name ?? copy.defaultAppName}</span>
+            <span className="text-muted-foreground">({activeAppSlug})</span>
+          </div>
+
           <div className="space-y-2 rounded-md border border-border/70 bg-muted/40 p-3">
-            <p className="text-sm font-medium">
-              {locale === 'fa'
-                ? `URL آپدیت برای کانال‌های اپ ${activeAppSlug}`
-                : `Update URLs for ${activeAppSlug} channels`}
-            </p>
+            <p className="text-sm font-medium">{copy.updateUrlsByChannel}</p>
             {channels.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {locale === 'fa' ? 'برای این اپ هنوز کانالی ثبت نشده است.' : 'No channels exist for this app yet.'}
-              </p>
+              <p className="text-xs text-muted-foreground">{copy.noChannels}</p>
             ) : (
               <div className="space-y-2">
-                {channels.map((channel) => {
-                  const channelUrl = buildManifestUrl(activeAppSlug, channel.name);
-                  const copyKey = `channel-${channel.id}`;
-                  return (
-                    <div
-                      key={channel.id}
-                      className="rounded border border-border bg-white px-2 py-2 text-xs"
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="font-medium">{channel.name}</span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void copyValue(channelUrl, copyKey)}
-                          >
-                            {locale === 'fa' ? 'کپی URL' : 'Copy URL'}
-                          </Button>
-                          {copiedKey === copyKey ? (
-                            <span className="text-success">{locale === 'fa' ? 'کپی شد' : 'Copied'}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <p className="break-all rounded border border-border bg-muted px-2 py-1">
-                        {channelUrl}
-                      </p>
-                    </div>
-                  );
-                })}
+                {channels.map((channel) => (
+                  <div key={channel.id} className="rounded border border-border bg-white px-2 py-2 text-xs">
+                    <div className="mb-1 font-medium">{channel.name}</div>
+                    <p className="break-all rounded border border-border bg-muted px-2 py-1">
+                      {buildManifestUrl(channel.name)}
+                    </p>
+                  </div>
+                ))}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              {locale === 'fa'
-                ? 'برای هر محیط، URL کانال مناسب را داخل updates.url در اپ قرار دهید.'
-                : 'Use the matching channel URL in your app updates.url for each environment.'}
-            </p>
           </div>
+
           {userRole === 'admin' ? (
             <div className="space-y-3 rounded-md border border-border/70 bg-muted/40 p-3">
               <div>
-                <p className="text-sm font-medium">Code Signing (optional)</p>
-                <p className="text-xs text-muted-foreground">
-                  Store a PEM private key for the active app. If empty, signing only uses global PRIVATE_KEY_PATH.
-                </p>
+                <p className="text-sm font-medium">{copy.codeSigningTitle}</p>
+                <p className="text-xs text-muted-foreground">{copy.codeSigningDesc}</p>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <Badge variant={activeApp?.hasCodeSigningPrivateKey ? 'success' : 'muted'}>
-                  {activeApp?.hasCodeSigningPrivateKey ? 'App key configured' : 'No app key'}
+                <Badge variant={app?.hasCodeSigningPrivateKey ? 'success' : 'muted'}>
+                  {app?.hasCodeSigningPrivateKey ? copy.keyConfigured : copy.noAppKey}
                 </Badge>
-                <span className="text-muted-foreground">Active app: {activeAppSlug}</span>
               </div>
               <form className="space-y-3" onSubmit={(event) => void handleSaveSigning(event)}>
                 <div className="space-y-1">
-                  <FieldLabel
-                    label="Key ID"
-                    hint="Must match updates.codeSigningMetadata.keyid in the client app."
-                  />
-                  <Input
-                    value={signingKeyId}
-                    onChange={(event) => setSigningKeyId(event.target.value)}
-                    placeholder="main"
-                  />
+                  <FieldLabel label={copy.keyIdLabel} hint={copy.keyIdHint} />
+                  <Input value={signingKeyId} onChange={(event) => setSigningKeyId(event.target.value)} placeholder="main" />
                 </div>
                 <div className="space-y-1">
-                  <FieldLabel
-                    label="Private Key (PEM)"
-                    hint="Optional. Paste PEM here to add or rotate the app key."
-                  />
+                  <FieldLabel label={copy.privateKeyLabel} hint={copy.privateKeyHint} />
                   <Textarea
                     value={signingPrivateKeyPem}
                     onChange={(event) => setSigningPrivateKeyPem(event.target.value)}
@@ -375,64 +318,22 @@ function SettingsContent({
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button type="submit" loading={savingSigning} loadingText="Saving...">
-                    Save Signing Settings
+                  <Button type="submit" loading={savingSigning} loadingText={copy.saving}>
+                    {copy.saveSigning}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => void handleClearSigningKey()}
                     loading={savingSigning}
-                    loadingText="Clearing..."
+                    loadingText={copy.clearing}
                   >
-                    Clear App Key
+                    {copy.clearAppKey}
                   </Button>
                 </div>
               </form>
             </div>
           ) : null}
-          <div className="overflow-auto">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t(locale, 'settings.apps.id')}</Th>
-                  <Th>{t(locale, 'settings.apps.name')}</Th>
-                  <Th>{t(locale, 'settings.apps.slug')}</Th>
-                  <Th>{locale === 'fa' ? 'وضعیت' : 'Status'}</Th>
-                  <Th>{locale === 'fa' ? 'ایجاد شده' : 'Created'}</Th>
-                  <Th>{locale === 'fa' ? 'URL تولید' : 'Production URL'}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {apps.map((app) => {
-                  const productionUrl = buildManifestUrl(app.slug, 'production');
-                  const isActive = app.slug === activeAppSlug;
-                  return (
-                    <tr key={app.id}>
-                      <Td>{app.id}</Td>
-                      <Td>{app.name}</Td>
-                      <Td>{app.slug}</Td>
-                      <Td>
-                        <Badge variant={isActive ? 'success' : 'muted'}>
-                          {isActive
-                            ? locale === 'fa'
-                              ? 'فعال'
-                              : 'Active'
-                            : locale === 'fa'
-                              ? 'غیرفعال'
-                              : 'Inactive'}
-                        </Badge>
-                      </Td>
-                      <Td>{formatDate(app.createdAt, locale)}</Td>
-                      <Td>
-                        <span className="break-all text-xs text-muted-foreground">{productionUrl || '-'}</span>
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
         </CardContent>
       </Card>
 
@@ -456,7 +357,7 @@ function SettingsContent({
                   <Th>{t(locale, 'settings.users.id')}</Th>
                   <Th>{t(locale, 'settings.users.username')}</Th>
                   <Th>{t(locale, 'settings.users.role')}</Th>
-                  <Th>{locale === 'fa' ? 'سطح دسترسی' : 'Permission Scope'}</Th>
+                  <Th>{copy.permissionScope}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -465,56 +366,55 @@ function SettingsContent({
                     <Td>{user.id}</Td>
                     <Td>{user.username}</Td>
                     <Td>{t(locale, `shell.role.${user.role}`)}</Td>
-                    <Td>
-                      {user.role === 'admin'
-                        ? locale === 'fa'
-                          ? 'دسترسی کامل به انتشار، تنظیمات و عملیات'
-                          : 'Full access to releases, settings, and operations'
-                        : locale === 'fa'
-                          ? 'فقط مشاهده داشبورد و گزارش‌ها'
-                          : 'Read-only access to dashboard and logs'}
-                    </Td>
+                    <Td>{user.role === 'admin' ? copy.fullAccess : copy.readOnly}</Td>
                   </tr>
                 ))}
               </tbody>
             </Table>
           </div>
+          {users.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {copy.lastRefreshed}: {formatDate(new Date().toISOString(), locale)}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
-      {userRole === 'admin' ? (
-        <Modal
-          open={showCreateAppModal}
-          onClose={() => setShowCreateAppModal(false)}
-          title={t(locale, 'settings.apps.create')}
-          description={t(locale, 'settings.apps.description')}
-          widthClassName="max-w-3xl"
-        >
-          <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void handleCreateApp(event)}>
+      <Card>
+        <CardHeader>
+          <CardTitle>{copy.changePasswordTitle}</CardTitle>
+          <CardDescription>{copy.changePasswordDesc}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 md:grid-cols-3" onSubmit={(event) => void handleChangePassword(event)}>
             <div className="space-y-1">
-              <FieldLabel label={t(locale, 'settings.apps.appName')} hint={hints.appName} />
-              <Input value={appName} onChange={(event) => setAppName(event.target.value)} placeholder={t(locale, 'settings.apps.appName')} required />
+              <FieldLabel label={copy.currentPassword} hint={copy.currentPasswordHint} />
+              <Input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                placeholder={copy.currentPassword}
+                required
+              />
             </div>
             <div className="space-y-1">
-              <FieldLabel label={t(locale, 'settings.apps.appSlug')} hint={hints.appSlug} />
+              <FieldLabel label={copy.newPassword} hint={copy.newPasswordHint} />
               <Input
-                value={appSlugInput}
-                onChange={(event) => setAppSlugInput(event.target.value)}
-                placeholder={t(locale, 'settings.apps.appSlug')}
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder={copy.newPassword}
+                required
               />
             </div>
             <div className="self-end">
-              <Button
-                type="submit"
-                loading={creatingApp}
-                loadingText="Creating..."
-              >
-                {t(locale, 'settings.apps.create')}
+              <Button type="submit" loading={changingPassword} loadingText={copy.updating}>
+                {copy.updatePassword}
               </Button>
             </div>
           </form>
-        </Modal>
-      ) : null}
+        </CardContent>
+      </Card>
 
       {userRole === 'admin' ? (
         <Modal
@@ -526,26 +426,22 @@ function SettingsContent({
         >
           <form className="grid gap-3 md:grid-cols-4" onSubmit={(event) => void handleCreateUser(event)}>
             <div className="space-y-1">
-              <FieldLabel label={t(locale, 'settings.users.username')} hint={hints.username} />
+              <FieldLabel label={t(locale, 'settings.users.username')} hint={copy.usernameHint} />
               <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t(locale, 'settings.users.username')} required />
             </div>
             <div className="space-y-1">
-              <FieldLabel label={t(locale, 'settings.users.password')} hint={hints.password} />
+              <FieldLabel label={t(locale, 'settings.users.password')} hint={copy.passwordHint} />
               <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t(locale, 'settings.users.password')} required />
             </div>
             <div className="space-y-1">
-              <FieldLabel label={t(locale, 'settings.users.role')} hint={hints.role} />
+              <FieldLabel label={t(locale, 'settings.users.role')} hint={copy.roleHint} />
               <Select value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'viewer')}>
                 <option value="viewer">{t(locale, 'settings.users.roleViewer')}</option>
                 <option value="admin">{t(locale, 'settings.users.roleAdmin')}</option>
               </Select>
             </div>
             <div className="self-end">
-              <Button
-                type="submit"
-                loading={creatingUser}
-                loadingText="Creating..."
-              >
+              <Button type="submit" loading={creatingUser} loadingText={copy.creating}>
                 {t(locale, 'settings.users.create')}
               </Button>
             </div>
@@ -555,4 +451,3 @@ function SettingsContent({
     </div>
   );
 }
-

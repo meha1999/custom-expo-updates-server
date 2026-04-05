@@ -18,9 +18,9 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
 const typeClasses: Record<ToastType, string> = {
-  success: 'border-success/40 bg-success/10 text-success',
-  error: 'border-danger/40 bg-danger/10 text-danger',
-  info: 'border-primary/30 bg-primary/10 text-primary',
+  success: 'border-success bg-success text-white',
+  error: 'border-danger bg-danger text-white',
+  info: 'border-primary bg-primary text-primary-foreground',
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -58,7 +58,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={toast.id}
               className={cn(
-                'pointer-events-auto flex items-start justify-between gap-3 rounded-md border p-3 text-sm shadow-soft',
+                'pointer-events-auto flex items-start justify-between gap-3 rounded-md border p-3 text-sm shadow-[0_18px_40px_rgba(2,6,23,0.24)]',
                 typeClasses[toast.type],
               )}
               role="status"
@@ -67,7 +67,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <p className="min-w-0 flex-1 break-words">{toast.message}</p>
               <button
                 type="button"
-                className="text-xs opacity-80 transition hover:opacity-100"
+                className="text-xs font-medium opacity-90 transition hover:opacity-100"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Dismiss notification"
               >
@@ -88,4 +88,3 @@ export function useToast() {
   }
   return value;
 }
-

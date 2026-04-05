@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '../../common/auth';
 import { getDashboardSnapshot } from '../../common/controlPlaneDb';
 import { getSingleValue } from '../../common/requestContext';
+import { SINGLE_APP_SLUG } from '../../common/singleApp';
 
 export default async function dashboardEndpoint(req: NextApiRequest, res: NextApiResponse) {
   const user = requireAuth(req, res);
@@ -16,13 +17,12 @@ export default async function dashboardEndpoint(req: NextApiRequest, res: NextAp
   }
 
   const queryLimit = getSingleValue(req.query.limit);
-  const appSlug = getSingleValue(req.query.app) ?? 'default';
   const limit = Number.parseInt(queryLimit ?? '100', 10);
   const safeLimit = Number.isFinite(limit) ? limit : 100;
 
   try {
     const snapshot = getDashboardSnapshot({
-      appSlug,
+      appSlug: SINGLE_APP_SLUG,
       limit: safeLimit,
     });
     res.statusCode = 200;

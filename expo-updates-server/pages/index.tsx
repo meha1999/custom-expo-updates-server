@@ -135,12 +135,6 @@ export default function LoginPage() {
                 {submitting ? t(locale, 'login.signingIn') : t(locale, 'login.signIn')}
               </Button>
             </form>
-            <div className="mt-4 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
-              <p>
-                {t(locale, 'login.defaultLogin')}{' '}
-                <span className="font-semibold">admin / change-me-now</span>
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>

@@ -406,12 +406,20 @@ function ensureAppSigningColumns(db: Database.Database): void {
 function seedDefaults(db: Database.Database): void {
   const now = new Date().toISOString();
   const adminUsername = process.env.DASHBOARD_ADMIN_USERNAME ?? 'admin';
-  const adminPassword = process.env.DASHBOARD_ADMIN_PASSWORD ?? 'change-me-now';
+  const adminPassword = process.env.DASHBOARD_ADMIN_PASSWORD;
 
   const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get(adminUsername) as
     | { id: number }
     | undefined;
   if (!existingAdmin) {
+    if (!adminPassword) {
+      throw new Error(
+        'DASHBOARD_ADMIN_PASSWORD is required to bootstrap the first admin account.',
+      );
+    }
+    if (adminPassword === 'change-me-now') {
+      throw new Error('DASHBOARD_ADMIN_PASSWORD cannot be "change-me-now".');
+    }
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = hashPassword(adminPassword, salt);
     db.prepare(
@@ -543,6 +551,22 @@ export function listUsers(): AuthUser[] {
   }));
 }
 
+export function getUserRoleCounts(): { total: number; admins: number; viewers: number } {
+  const db = ensureInitialized();
+  const totalRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+  const adminRow = db
+    .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")
+    .get() as { count: number };
+  const viewerRow = db
+    .prepare("SELECT COUNT(*) as count FROM users WHERE role = 'viewer'")
+    .get() as { count: number };
+  return {
+    total: totalRow.count ?? 0,
+    admins: adminRow.count ?? 0,
+    viewers: viewerRow.count ?? 0,
+  };
+}
+
 export function createUser(input: {
   username: string;
   password: string;
@@ -570,6 +594,48 @@ export function createUser(input: {
     role: input.role,
     createdAt: now,
   };
+}
+
+export function changeUserPassword(input: {
+  userId: number;
+  currentPassword: string;
+  newPassword: string;
+}): void {
+  const db = ensureInitialized();
+  const currentPassword = `${input.currentPassword ?? ''}`;
+  const newPassword = `${input.newPassword ?? ''}`;
+  if (!currentPassword || !newPassword) {
+    throw new Error('currentPassword and newPassword are required');
+  }
+  if (newPassword.length < 8) {
+    throw new Error('Password must be at least 8 characters');
+  }
+
+  const user = db
+    .prepare('SELECT id, password_hash, password_salt FROM users WHERE id = ?')
+    .get(input.userId) as
+    | {
+        id: number;
+        password_hash: string;
+        password_salt: string;
+      }
+    | undefined;
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+  if (!verifyPassword(currentPassword, user.password_salt, user.password_hash)) {
+    throw new Error('Current password is incorrect');
+  }
+
+  const nextSalt = crypto.randomBytes(16).toString('hex');
+  const nextHash = hashPassword(newPassword, nextSalt);
+  db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').run(
+    nextHash,
+    nextSalt,
+    input.userId,
+  );
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(input.userId);
 }
 
 export function authenticateUser(username: string, password: string): AuthSession {
@@ -1687,7 +1753,9 @@ export function listRequestLogs(filters: LogFilters): {
 }
 
 function csvEscape(value: unknown): string {
-  const text = `${value ?? ''}`.replace(/"/g, '""');
+  const raw = `${value ?? ''}`;
+  const safePrefix = /^[\s]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  const text = safePrefix.replace(/"/g, '""');
   return `"${text}"`;
 }
 

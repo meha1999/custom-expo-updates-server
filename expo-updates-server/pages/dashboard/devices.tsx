@@ -18,12 +18,12 @@ export default function DevicesPage() {
       title={t(locale, 'devices.title')}
       subtitle={t(locale, 'devices.subtitle')}
     >
-      {({ appSlug }) => <DevicesContent appSlug={appSlug} />}
+      {() => <DevicesContent />}
     </DashboardPage>
   );
 }
 
-function DevicesContent({ appSlug }: { appSlug: string }) {
+function DevicesContent() {
   const { locale } = useLocale();
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [search, setSearch] = useState('');
@@ -39,7 +39,7 @@ function DevicesContent({ appSlug }: { appSlug: string }) {
     async function load() {
       try {
         const data = await jsonFetch<DashboardPayload>(
-          `/api/dashboard?app=${encodeURIComponent(appSlug)}&limit=80`,
+          '/api/dashboard?limit=80',
         );
         if (!active) return;
         setPayload(data);
@@ -53,7 +53,7 @@ function DevicesContent({ appSlug }: { appSlug: string }) {
     return () => {
       active = false;
     };
-  }, [appSlug, locale]);
+  }, [locale]);
 
   const filteredDevices = useMemo(() => {
     const rows = payload?.devices ?? [];

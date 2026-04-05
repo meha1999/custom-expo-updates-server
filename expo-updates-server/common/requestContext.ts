@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { NextApiRequest } from 'next';
+import { SINGLE_APP_SLUG } from './singleApp';
 
 export interface RequestContextInfo {
   appSlug: string;
@@ -23,8 +24,7 @@ export function getSingleValue(value: string | string[] | undefined): string | u
 }
 
 export function getRequestContext(req: NextApiRequest): RequestContextInfo {
-  const appSlug =
-    getSingleValue(req.headers['x-app-slug']) ?? getQueryValue(req.query.app) ?? 'default';
+  const appSlug = SINGLE_APP_SLUG;
   const channelName =
     getSingleValue(req.headers['expo-channel-name']) ??
     getSingleValue(req.headers['x-channel-name']) ??
@@ -75,4 +75,3 @@ function getQueryValue(value: string | string[] | undefined): string | undefined
   }
   return undefined;
 }
-
